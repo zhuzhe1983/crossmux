@@ -136,6 +136,10 @@ class ActivityManager {
   void goToFullScreenMessage(std::string message, EpdFontFamily::Style style = EpdFontFamily::REGULAR);
   void goToCrashReport();
   void goToApps();
+  void goToAppStore();
+  void goToRfChat();
+  void goToWifiChat();
+  void goToEspChat();
   void goToSudoku();
   void goToSokoban();
   void goToGomoku();

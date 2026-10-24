@@ -33,6 +33,7 @@ class HalClock {
   void completeSync();
 
  public:
+  bool hasRtc() const { return _rtcAvailable; }
   // The POSIX UTC system clock is the runtime source on every device. An
   // external RTC, when present, is used only to restore time after power loss.
   void begin();

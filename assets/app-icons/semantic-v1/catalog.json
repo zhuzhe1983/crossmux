@@ -1,0 +1,144 @@
+{
+  "version": 1,
+  "name": "CrossMux semantic app icons",
+  "sizes": [
+    32,
+    48,
+    64,
+    96,
+    128
+  ],
+  "levels": [
+    2,
+    4,
+    16
+  ],
+  "icons": [
+    {
+      "id": "library",
+      "symbol": "Library",
+      "label": "书库",
+      "subject": "Three upright hardcover books on a short shelf, one leaning, one ribbon bookmark.",
+      "master": "masters/library.png"
+    },
+    {
+      "id": "transfer",
+      "symbol": "Transfer",
+      "label": "文件传输",
+      "subject": "Two large interlocking horizontal arrows pointing opposite directions, one dark teal and one light warm ochre, with a single cream document sheet tucked behind. Clear file exchange.",
+      "master": "masters/transfer.png"
+    },
+    {
+      "id": "opds",
+      "symbol": "Opds",
+      "label": "网络书库",
+      "subject": "An open cream book in front of a dark teal globe with just one longitude and latitude arc. Book dominates, globe clearly visible above it. Online catalog, not a bookshelf.",
+      "master": "masters/opds.png"
+    },
+    {
+      "id": "weread",
+      "symbol": "WeRead",
+      "label": "微信读书",
+      "subject": "A friendly open book with two tiny rounded chat speech bubbles above it, one dark teal and one warm ochre. Social reading. Invent an original symbol; no copied brand logo or wordmark.",
+      "master": "masters/weread.png"
+    },
+    {
+      "id": "airpage",
+      "symbol": "AirPage",
+      "label": "AirPage",
+      "subject": "A framed picture showing one dark mountain and a warm ochre sun, with a small paper airplane arriving from the upper right. Wireless image delivery. Large clear photo frame and airplane silhouette.",
+      "master": "masters/airpage.png"
+    },
+    {
+      "id": "reading_stats",
+      "symbol": "ReadingStats",
+      "label": "阅读统计",
+      "subject": "Three large ascending rounded bars growing out of the page of an open cream book. Dark teal, warm ochre and cream bars with dark borders. Reading progress and statistics.",
+      "master": "masters/reading_stats.png"
+    },
+    {
+      "id": "sudoku",
+      "symbol": "Sudoku",
+      "label": "数独",
+      "subject": "A straight-on rounded square sudoku board simplified to a clean 3 by 3 grid. Exactly nine equal large cells, five blank and four with single large readable digits 1, 2, 3, 9. Cream paper, dark teal border, one ochre highlighted cell.",
+      "master": "masters/sudoku.png"
+    },
+    {
+      "id": "gomoku",
+      "symbol": "Gomoku",
+      "label": "五子棋",
+      "subject": "A compact cream wood board with a simple sparse dark lattice and five round Go stones, three nearly black dark teal and two cream white with dark outlines. Diagonal sequence suggests five-in-a-row; not western chess.",
+      "master": "masters/gomoku.png"
+    },
+    {
+      "id": "sokoban",
+      "symbol": "Sokoban",
+      "label": "推箱子",
+      "subject": "One warm ochre wooden crate with a bold X brace and one broad dark teal right-pointing push arrow beside it. A single cream target square underneath. Very simple box pushing puzzle.",
+      "master": "masters/sokoban.png"
+    },
+    {
+      "id": "chinese_chess",
+      "symbol": "ChineseChess",
+      "label": "中国象棋",
+      "subject": "One large round ivory Chinese chess disc with a dark red carved Chinese character 帅 centered clearly, another dark teal disc partially behind, on a minimal 2-line board corner. Round Chinese xiangqi pieces; no western chess knight, king, pawn.",
+      "master": "masters/chinese_chess.png"
+    },
+    {
+      "id": "minesweeper",
+      "symbol": "Minesweeper",
+      "label": "扫雷",
+      "subject": "A stylized rounded dark teal minesweeper mine with six short blunt spikes, beside a warm ochre triangular flag on a short pole anchored to one cream square tile. Friendly classic puzzle symbol, no explosion.",
+      "master": "masters/minesweeper.png"
+    },
+    {
+      "id": "game2048",
+      "symbol": "Game2048",
+      "label": "2048",
+      "subject": "Two chunky rounded square puzzle tiles, a smaller light cream tile with a large dark 2 and a larger warm ochre tile with a large dark 4. Offset overlapping diagonal composition implies merging. Only text is exact single digits 2 and 4.",
+      "master": "masters/game2048.png"
+    },
+    {
+      "id": "avatar",
+      "symbol": "Avatar",
+      "label": "丑丑头像",
+      "subject": "A quirky friendly human avatar bust with a crooked smile, mismatched round eyes, a tuft of dark teal hair, cream face and ochre shirt. Clearly an amusing generated profile portrait. No enclosing frame.",
+      "master": "masters/avatar.png"
+    },
+    {
+      "id": "buddy",
+      "symbol": "Buddy",
+      "label": "Buddy",
+      "subject": "A small friendly round duck companion with an ochre body, cream belly, dark teal small wizard hat and big readable dot eyes. Two simple feet, one wing raised. A collectible buddy pet with bold silhouette, not a human avatar.",
+      "master": "masters/buddy.png"
+    },
+    {
+      "id": "pixel_switch",
+      "symbol": "PixelSwitch",
+      "label": "像素大战",
+      "subject": "A compact square pixel canvas made from a few large cream, teal and ochre square cells, with one large dark teal pencil touching a single ochre square at lower right. Collaborative pixel painting, no guns or game controller.",
+      "master": "masters/pixel_switch.png"
+    },
+    {
+      "id": "calculator",
+      "symbol": "Calculator",
+      "label": "计算器",
+      "subject": "A sturdy straight-on rounded pocket calculator, dark teal body, a large blank cream display and six large buttons; four cream small buttons and two ochre buttons. One large plus and one equal sign only. No tiny digits.",
+      "master": "masters/calculator.png"
+    },
+    {
+      "id": "woodfish",
+      "symbol": "Woodfish",
+      "label": "电子木鱼",
+      "subject": "A warm ochre traditional Chinese wooden fish temple percussion block, rounded hollow carved body with one curved slit, and one dark teal handled wooden mallet hovering diagonally above. Recognizable mokugyo, not a living fish, no fins or tail.",
+      "master": "masters/woodfish.png"
+    },
+    {
+      "id": "standby",
+      "symbol": "Standby",
+      "label": "待机显示",
+      "subject": "A compact cream e-paper display frame showing a simple analog clock with two dark hands; a large warm ochre crescent moon overlaps its upper right corner. Dark teal frame. Quiet standby clock, not a phone.",
+      "master": "masters/standby.png"
+    }
+  ]
+}

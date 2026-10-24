@@ -1,167 +1,188 @@
 #include "AppsMenuActivity.h"
 
+#include <HalStorage.h>
 #include <I18n.h>
 
 #include <algorithm>
 #include <cstdint>
+#include <cstdio>
+#include <cstring>
+#include <iterator>
+#include <numeric>
 #include <string>
 
+#include "AppCapabilities.h"
+#include "ChatBuildConfig.h"
 #include "CrossPointSettings.h"
 #include "InxItemLayout.h"
 #include "OpdsServerStore.h"
+#include "appstore/AppStoreActivity.h"
+#include "appstore/LuaAppActivity.h"
 #include "components/SubpageLayout.h"
 #include "components/UITheme.h"
 #include "components/UiAppHelpers.h"
-#include "components/icons/inx_apps.h"
+#include "crossstore/Package.h"
+#include "crossstore/StoreIcon.generated.h"
 #include "fontIds.h"
 
 namespace fui = freeink::ui;
 
 namespace {
-
-using appVisibility::appBit;
-using appVisibility::AppId;
-
-struct AppEntry {
-  AppId id;
-  StrId titleId;
-  UIIcon icon;
-  void (ActivityManager::*open)();
-};
-
-constexpr AppEntry kAppEntries[] = {
-    {AppId::Library, StrId::STR_LIBRARY, UIIcon::Library, &ActivityManager::goToLibrary},
-    {AppId::FileTransfer, StrId::STR_FILE_TRANSFER, UIIcon::Transfer, &ActivityManager::goToFileTransfer},
-    {AppId::OpdsBrowser, StrId::STR_OPDS_BROWSER, UIIcon::Opds, &ActivityManager::goToBrowser},
-#ifdef ENABLE_CHINESE_VERSION
-    {AppId::WeRead, StrId::STR_WEREAD_TITLE, UIIcon::WeRead, &ActivityManager::goToWeRead},
-#endif
-    {AppId::AirPage, StrId::STR_AIRPAGE_TITLE, UIIcon::AirPage, &ActivityManager::goToAirPage},
-    {AppId::ReadingStats, StrId::STR_READING_STATS, UIIcon::ReadingStats, &ActivityManager::goToReadingStatsMenu},
-    {AppId::Sudoku, StrId::STR_SUDOKU_TITLE, UIIcon::Sudoku, &ActivityManager::goToSudoku},
-    {AppId::Gomoku, StrId::STR_GOMOKU_TITLE, UIIcon::Gomoku, &ActivityManager::goToGomoku},
-    {AppId::Sokoban, StrId::STR_SOKOBAN_TITLE, UIIcon::Sokoban, &ActivityManager::goToSokoban},
-#ifdef ENABLE_CHINESE_VERSION
-    {AppId::ChineseChess, StrId::STR_CHINESE_CHESS_TITLE, UIIcon::ChineseChess, &ActivityManager::goToChineseChess},
-#endif
-    {AppId::Minesweeper, StrId::STR_MINESWEEPER_TITLE, UIIcon::Minesweeper, &ActivityManager::goToMinesweeper},
-    {AppId::Game2048, StrId::STR_2048_TITLE, UIIcon::Game2048, &ActivityManager::goToGame2048},
-    {AppId::UglyAvatar, StrId::STR_UGLY_AVATAR, UIIcon::Avatar, &ActivityManager::goToUglyAvatar},
-    {AppId::Buddy, StrId::STR_BUDDY_TITLE, UIIcon::Buddy, &ActivityManager::goToBuddy},
-    {AppId::PixelSwitch, StrId::STR_PIXEL_SWITCH_TITLE, UIIcon::PixelSwitch, &ActivityManager::goToPixelSwitch},
-    {AppId::Calculator, StrId::STR_CALCULATOR_TITLE, UIIcon::Calculator, &ActivityManager::goToCalculator},
-    {AppId::Woodfish, StrId::STR_WOODFISH_TITLE, UIIcon::Woodfish, &ActivityManager::goToWoodfish},
-    {AppId::Standby, StrId::STR_STANDBY_TITLE, UIIcon::Standby, &ActivityManager::goToStandby},
-};
-
-constexpr int kAppCount = static_cast<int>(sizeof(kAppEntries) / sizeof(kAppEntries[0]));
-
-constexpr int visibleAppCount(const uint32_t hiddenMask) {
-  int count = 0;
-  for (const auto& app : kAppEntries) {
-    if ((hiddenMask & appBit(app.id)) == 0) {
-      // cppcheck-suppress useStlAlgorithm
-      ++count;
-    }
-  }
-  return count;
+int iconSizeForCell(const Rect& cell, int lineHeight, int levels) {
+  if (levels == 16 && cell.height >= 96 + lineHeight + 18 && cell.width >= 108) return 96;
+  return cell.height >= 64 + lineHeight + 18 && cell.width >= 76 ? 64 : 32;
 }
-
-constexpr int appIndexForVisibleIndex(const uint32_t hiddenMask, const int visibleIndex) {
-  int visible = 0;
-  for (int appIndex = 0; appIndex < kAppCount; ++appIndex) {
-    if ((hiddenMask & appBit(kAppEntries[appIndex].id)) != 0) continue;
-    if (visible++ == visibleIndex) return appIndex;
-  }
-  return -1;
-}
-
-constexpr uint32_t effectiveHiddenMask(const uint32_t hiddenMask, const bool hasOpdsServers) {
-  uint32_t effective = hiddenMask;
-  if (!hasOpdsServers) effective |= appBit(AppId::OpdsBrowser);
-  return effective;
-}
-
-constexpr bool appIdsAreUnique() {
-  for (int i = 0; i < kAppCount; ++i) {
-    for (int j = i + 1; j < kAppCount; ++j) {
-      if (kAppEntries[i].id == kAppEntries[j].id) return false;
-    }
-  }
-  return true;
-}
-
-static_assert(kAppCount <= 32, "the app catalog must fit hiddenAppsMask");
-static_assert(static_cast<uint8_t>(AppId::Count) <= 32, "hiddenAppsMask supports at most 32 stable app IDs");
-static_assert(appIdsAreUnique(), "stable app IDs must not be reused");
-static_assert(visibleAppCount(0) == kAppCount, "a zero mask must show every compiled app");
-static_assert(visibleAppCount(UINT32_MAX) == 0, "a full mask must hide every compiled app");
-static_assert(visibleAppCount(appBit(AppId::Woodfish)) == kAppCount - 1, "the widened mask must hide Woodfish");
-static_assert(visibleAppCount(effectiveHiddenMask(0, false)) == kAppCount - 1,
-              "OPDS must be hidden when no server is configured");
-static_assert(visibleAppCount(effectiveHiddenMask(0, true)) == kAppCount,
-              "all apps must be available regardless of language");
-static_assert(appIndexForVisibleIndex(appBit(kAppEntries[1].id), 1) == 2,
-              "visible indices must skip a hidden middle app");
-
 }  // namespace
 
-int AppsMenuActivity::getAppCount() { return kAppCount; }
-
-StrId AppsMenuActivity::getAppTitleId(const int appIndex) {
-  return appIndex >= 0 && appIndex < kAppCount ? kAppEntries[appIndex].titleId : StrId::STR_NONE_OPT;
-}
-
-bool AppsMenuActivity::isAppVisible(const int appIndex) {
-  if (appIndex < 0 || appIndex >= kAppCount) return false;
-  return (SETTINGS.hiddenAppsMask & appBit(kAppEntries[appIndex].id)) == 0;
-}
-
-bool AppsMenuActivity::setAppVisible(const int appIndex, const bool visible) {
-  if (appIndex < 0 || appIndex >= kAppCount) return false;
-
-  const uint32_t bit = appBit(kAppEntries[appIndex].id);
-  const uint32_t updatedMask = visible ? SETTINGS.hiddenAppsMask & ~bit : SETTINGS.hiddenAppsMask | bit;
-  if (updatedMask == SETTINGS.hiddenAppsMask) return false;
-
-  SETTINGS.hiddenAppsMask = updatedMask;
-  return true;
-}
-
-int AppsMenuActivity::getVisibleAppCount() {
-  return visibleAppCount(effectiveHiddenMask(SETTINGS.hiddenAppsMask, OPDS_STORE.hasServers()));
-}
+int AppsMenuActivity::getAppCount() { return 1; }
+StrId AppsMenuActivity::getAppTitleId(int) { return StrId::STR_APPSTORE; }
+bool AppsMenuActivity::isAppVisible(int index) { return index == 0; }
+bool AppsMenuActivity::isAppSupported(int index) { return index == 0; }
+bool AppsMenuActivity::setAppVisible(int, bool) { return false; }
 
 void AppsMenuActivity::selectMainTabContentEdge(const MainTabContentEdge edge) {
+  if (BoardConfig::isPaperMono() && usesIconLayout()) {
+    turnIconPage(edge == MainTabContentEdge::First ? 1 : -1);
+    return;
+  }
   moveSelectionTo(MainTabs::contentEdgeIndex(edge, getVisibleAppCount()));
 }
-
-int AppsMenuActivity::getAppIndexForVisibleIndex(const int visibleIndex) {
-  return appIndexForVisibleIndex(effectiveHiddenMask(SETTINGS.hiddenAppsMask, OPDS_STORE.hasServers()), visibleIndex);
-}
-
 void AppsMenuActivity::onEnter() {
   UiListActivity::onEnter();
-  rebuildRowItems();
+  guardGridButtons();
+  reloadInstalled();
 }
-
+void AppsMenuActivity::onExit() {
+  icons.clear();
+  rowItems.clear();
+  Activity::onExit();
+}
+void AppsMenuActivity::loop() {
+  UiListActivity::loop();
+  if (iconCacheStart != nav.top) {
+    RenderLock lock;
+    loadPageIcons();
+    requestUpdate();
+  }
+}
+void AppsMenuActivity::guardGridButtons() {
+  using Button = MappedInputManager::Button;
+  gridButtonReleasePending = mappedInput.isPressed(Button::Up) || mappedInput.isPressed(Button::Down);
+}
+bool AppsMenuActivity::handleCustomInput() {
+  if (!BoardConfig::isPaperMono() || !usesIconLayout()) return false;
+  using Button = MappedInputManager::Button;
+  const bool up = mappedInput.wasPressed(Button::Up);
+  const bool down = mappedInput.wasPressed(Button::Down);
+  const bool blocked = gridButtonReleasePending;
+  if (blocked) guardGridButtons();
+  const bool active = up || down || mappedInput.isPressed(Button::Up) || mappedInput.isPressed(Button::Down) ||
+                      mappedInput.wasReleased(Button::Up) || mappedInput.wasReleased(Button::Down);
+  if (!blocked && !active) return false;
+  // Only physical navigation is claimed. Independent touch remains usable
+  // while an inherited or already-handled page key is held.
+  const auto touch = routeTouch(mappedInput);
+  if (touch.routed && app.invalidated()) requestUpdate();
+  if (touch) return true;
+  int x = 0, y = 0;
+  const auto swipe = mappedInput.wasSwipe(&x, &y);
+  if (handleListSwipe(swipe, x, y)) return true;
+  if (blocked) return true;
+  if (up || down) {
+    guardGridButtons();
+    if (up != down) turnIconPage(up ? -1 : 1);
+  }
+  // No row-selection or continuous-navigation fallback for a page-key hold.
+  return true;
+}
+void AppsMenuActivity::turnIconPage(const int direction) {
+  RenderLock lock;
+  constexpr int capacity = InxGridGeometry::itemsPerPage;
+  const int lastPage = (getVisibleAppCount() - 1) / capacity;
+  const int page = std::clamp(nav.top / capacity + direction, 0, lastPage);
+  const int next = page * capacity;
+  if (next == nav.top) return;
+  // Set the viewport and icon cache together before publishing the next frame.
+  // The existing per-page icon budget is reused; no extra page is retained.
+  nav.requestSelection(next);
+  nav.top = next;
+  clearContentSelection();
+  closeRouting();
+  loadPageIcons();
+  requestUpdate();
+}
+bool AppsMenuActivity::handleListSwipe(const MappedInputManager::SwipeDir swipe, const int x, const int y) {
+  if (BoardConfig::isPaperMono() && usesIconLayout() &&
+      (swipe == MappedInputManager::SwipeDir::Up || swipe == MappedInputManager::SwipeDir::Down)) {
+    turnIconPage(swipe == MappedInputManager::SwipeDir::Up ? 1 : -1);
+    return true;
+  }
+  return UiListActivity::handleListSwipe(swipe, x, y);
+}
+const char* AppsMenuActivity::appTitle(int index) const {
+  return index >= 0 && static_cast<size_t>(index) < installedCount ? installedApps[index].name : tr(STR_APPSTORE);
+}
+void AppsMenuActivity::reloadInstalled() {
+  RenderLock lock;
+  closeRouting();
+  crossstore::recoverInstalls();
+  installedCount = 0;
+  auto dir = Storage.open(crossstore::INSTALL_DIR);
+  if (dir && dir.isDirectory()) {
+    while (auto file = dir.openNextFile()) {
+      char filename[64]{};
+      file.getName(filename, sizeof(filename));
+      if (!crossstore::installedFilename(filename)) continue;
+      crossstore::Package package;
+      const std::string path = std::string(crossstore::INSTALL_DIR) + "/" + filename;
+      if (!crossstore::readPackage(path, package) || path != crossstore::installedPath(package.id)) continue;
+      if (installedCount == MAX_INSTALLED) break;
+      auto& entry = installedApps[installedCount++];
+      std::snprintf(entry.id, sizeof(entry.id), "%s", package.id);
+      std::snprintf(entry.name, sizeof(entry.name), "%s", package.name);
+    }
+  }
+  std::sort(installedApps.begin(), installedApps.begin() + installedCount,
+            [](const auto& a, const auto& b) { return std::strcmp(a.name, b.name) < 0; });
+  nav.top = std::min(nav.top, std::max(0, getVisibleAppCount() - 1));
+  rebuildRowItems();
+  loadPageIcons();
+  requestUpdate();
+}
 void AppsMenuActivity::rebuildRowItems() {
   rowItems.clear();
-  rowItems.reserve(static_cast<size_t>(getVisibleAppCount()));
-  for (int visibleIndex = 0; visibleIndex < getVisibleAppCount(); ++visibleIndex) {
-    const int appIndex = getAppIndexForVisibleIndex(visibleIndex);
-    if (appIndex < 0) continue;
+  rowItems.reserve(installedCount + 1);
+  for (int index = 0; index < getVisibleAppCount(); ++index) {
     fui::ListItem item;
-    item.label = I18N.get(kAppEntries[appIndex].titleId);
-    item.icon = listIconFor(kAppEntries[appIndex].icon, 32);
-    item.actionValue = static_cast<int16_t>(visibleIndex);
+    item.label = appTitle(index);
+    item.icon = listIconFor(UIIcon::Apps, 32);
+    item.actionValue = static_cast<int16_t>(index);
     rowItems.push_back(item);
+  }
+}
+void AppsMenuActivity::loadPageIcons() {
+  iconCacheStart = nav.top;
+  icons.clear();
+  const bool grid = usesIconLayout();
+  const auto rect = appContentRect();
+  const int lineHeight = renderer.getLineHeight(UI_10_FONT_ID);
+  const int levels = renderer.getGrayscaleLevels();
+  for (size_t slot = 0; slot < crossstore::PackageIcons::CAPACITY; ++slot) {
+    const size_t index = static_cast<size_t>(iconCacheStart) + slot;
+    if (index > installedCount) break;
+    const auto cell = InxGridGeometry::cellBounds(static_cast<int>(slot), rect.width, rect.height);
+    const int size = grid ? iconSizeForCell(cell, lineHeight, levels) : 32;
+    if (index == installedCount) {
+      icons.loadEmbeddedBundle(slot, crossstore::builtin::STORE_ICON, sizeof(crossstore::builtin::STORE_ICON), levels,
+                               size);
+    } else {
+      icons.loadPackage(slot, crossstore::installedPath(installedApps[index].id).c_str(), levels, size);
+    }
   }
 }
 
 bool AppsMenuActivity::usesIconLayout() const {
-  return UITheme::getInstance().hasMainTabs() &&
-         InxGridGeometry::layoutFrom(SETTINGS.inxAppsLayout) == InxItemLayout::Icons;
+  return InxGridGeometry::layoutFrom(SETTINGS.inxAppsLayout) == InxItemLayout::Icons;
 }
 
 Rect AppsMenuActivity::appContentRect() const {
@@ -174,7 +195,15 @@ Rect AppsMenuActivity::appContentRect() const {
 
 void AppsMenuActivity::openSelected() {
   const int appIndex = getAppIndexForVisibleIndex(nav.selected);
-  if (appIndex >= 0) (activityManager.*kAppEntries[appIndex].open)();
+  if (appIndex < 0) return;
+  if (static_cast<size_t>(appIndex) < installedCount)
+    startActivityForResultWith<LuaAppActivity>([this](const ActivityResult&) { guardGridButtons(); },
+                                               installedApps[appIndex].id);
+  else
+    startActivityForResultWith<AppStoreActivity>([this](const ActivityResult&) {
+      guardGridButtons();
+      reloadInstalled();
+    });
 }
 
 void AppsMenuActivity::activateIndex(const int index) {
@@ -184,7 +213,7 @@ void AppsMenuActivity::activateIndex(const int index) {
 }
 
 void AppsMenuActivity::drawIconGrid(UiScreen& screen, const Rect& rect, const int visibleCount,
-                                    const bool showSelection) const {
+                                    const bool showSelection) {
   const int start = nav.top;
   const int lineHeight = renderer.getLineHeight(UI_10_FONT_ID);
 
@@ -194,40 +223,38 @@ void AppsMenuActivity::drawIconGrid(UiScreen& screen, const Rect& rect, const in
     if (appIndex < 0) continue;
     const auto bounds = InxGridGeometry::cellBounds(slot, rect.width, rect.height);
     const Rect cell{rect.x + bounds.x, rect.y + bounds.y, bounds.width, bounds.height};
-    const int iconScale = cell.height >= InxAppIcons::size * 2 + lineHeight + 18 ? 2 : 1;
-    const int iconSize = InxAppIcons::size * iconScale;
+    const int iconSize = iconSizeForCell(cell, lineHeight, renderer.getGrayscaleLevels());
     const bool isSelected = showSelection && visibleIndex == nav.selected;
-    if (isSelected) renderer.fillRect(cell.x, cell.y, cell.width, cell.height, true);
+    if (isSelected) renderer.drawRoundedRect(cell.x + 2, cell.y + 2, cell.width - 4, cell.height - 4, 2, 10, true);
     screen.frame().hit(fui::Rect{static_cast<int16_t>(cell.x), static_cast<int16_t>(cell.y),
                                  static_cast<int16_t>(cell.width), static_cast<int16_t>(cell.height)},
                        ACTION_ROW, static_cast<int16_t>(visibleIndex), fui::InputTouch);
 
     const int iconX = cell.x + (cell.width - iconSize) / 2;
     const int iconY = cell.y + std::max(5, (cell.height - iconSize - lineHeight - 8) / 2);
-    InxAppIcons::draw(renderer, kAppEntries[appIndex].icon, iconX, iconY, iconScale, isSelected);
+    paintIcon(appIndex, iconX, iconY, iconSize);
     auto text = screen.theme().bodyText;
     text.align = fui::TextAlign::Center;
     text.bold = false;
-    text.color = isSelected ? fui::Color::White : fui::Color::Black;
+    text.color = fui::Color::Black;
     screen.target().text(fui::Rect{static_cast<int16_t>(cell.x + 4), static_cast<int16_t>(iconY + iconSize + 8),
                                    static_cast<int16_t>(std::max(1, cell.width - 8)), static_cast<int16_t>(lineHeight)},
-                         I18N.get(kAppEntries[appIndex].titleId), text);
+                         appTitle(appIndex), text);
   }
 
   GUI.drawSideScrollBar(renderer, rect, visibleCount, start, InxGridGeometry::itemsPerPage);
 }
 
 void AppsMenuActivity::buildScreen(UiScreen& screen) {
+  icons.resetPlacements();
   const int sw = renderer.getScreenWidth();
   const int sh = renderer.getScreenHeight();
   const Rect content = appContentRect();
   const int visibleCount = getVisibleAppCount();
   const bool showSelection = showMainTabContentSelection();
 
-  if (visibleCount == 0) {
-    UITheme::drawCenteredWrappedText(renderer, content, UI_12_FONT_ID, tr(STR_NO_APPS_ENABLED), 2);
-  } else if (usesIconLayout()) {
-    syncPagedViewport(InxGridGeometry::itemsPerPage);
+  if (usesIconLayout()) {
+    syncPagedViewport(InxGridGeometry::itemsPerPage, BoardConfig::isPaperMono());
     drawIconGrid(screen, content, visibleCount, showSelection);
   } else {
     screen.setContentMarginFromScreen(
@@ -238,10 +265,28 @@ void AppsMenuActivity::buildScreen(UiScreen& screen) {
     props.count = static_cast<uint16_t>(rowItems.size());
     props.action = ACTION_ROW;
     props.inputMask = fui::InputTouch;
+    props.iconPainter = paintListIcon;
+    props.iconPainterCtx = this;
     syncListViewport(screen, props);
     screen.list(props);
   }
 }
+
+void AppsMenuActivity::paintListIcon(void* ctx, const fui::Rect& rect, const fui::ListItem& item, const fui::Paint) {
+  auto& self = *static_cast<AppsMenuActivity*>(ctx);
+  const int index = self.getAppIndexForVisibleIndex(item.actionValue);
+  if (index < 0) return;
+  const int size = std::min(rect.width, rect.height);
+  self.paintIcon(index, rect.x + (rect.width - size) / 2, rect.y + (rect.height - size) / 2, size);
+}
+
+void AppsMenuActivity::paintIcon(const int appIndex, const int x, const int y, const int size) {
+  icons.paint(renderer, appIndex - iconCacheStart, x, y, size);
+}
+
+void AppsMenuActivity::beginDisplayFrame() { icons.beginFrame(renderer); }
+
+void AppsMenuActivity::displayFrame() { icons.displayFrame(renderer); }
 
 void AppsMenuActivity::drawChrome() {
   const auto& metrics = UITheme::getInstance().getMetrics();

@@ -29,6 +29,9 @@ const char* getDeviceModel();
 const char* getChipModel();
 bool getDeviceId(DeviceId& out);
 bool getWifiStationMac(DeviceId& out);
+bool supportsWifi();
+// Board-profile information only; does not power or start microphone capture.
+bool hasConfiguredMicrophone();
 bool getChipTemperatureCelsius(float& out);
 uint64_t getUptimeSeconds();
 HeapInfo getHeapInfo();

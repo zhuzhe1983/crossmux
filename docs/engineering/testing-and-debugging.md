@@ -49,6 +49,23 @@ pio run -t upload && pio device monitor
 
 **Via VS Code**: Click Monitor (🔌) button in PlatformIO toolbar
 
+The running firmware accepts these newline-terminated commands on its existing
+USB serial console:
+
+- `CMD:SCREENSHOT`: return the current monochrome framebuffer.
+- `CMD:CRASH_REPORT`: read `/crash_report.txt` without changing it. The response
+  has `CRASH_REPORT_START:<bytes>` / `CRASH_REPORT_END` markers, or a
+  `CRASH_REPORT_ERROR` line. The fixed path is limited to 32 KiB and streamed in
+  128-byte chunks; arbitrary filesystem paths are not accepted. Console logs
+  can be interleaved, so preserve the full capture when decoding a report.
+- `CMD:USB_DRIVE`: enter the same USB disk activity as the device menu on
+  supported boards. It releases SD font handles before handing the card to the
+  host. Safely eject the host disk to leave this mode. Unsupported boards return
+  `USB_DRIVE_ERROR:unsupported`.
+
+These commands require firmware that includes the corresponding handlers. The
+normal serial command loop is suspended while the USB host owns the SD card.
+
 ## Code Quality
 
 ```bash

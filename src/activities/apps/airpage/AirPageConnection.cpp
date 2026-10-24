@@ -266,6 +266,7 @@ AirPageConnection::Event AirPageConnection::handleWifiFailure() {
 }
 
 bool AirPageConnection::startWifiAssociation() {
+  if (externalWifiOwner_) return false;  // The host owns association and shared background listeners.
   if (WIFI_STORE.getCredentialCount() == 0) WIFI_STORE.loadFromFile();
   const std::string lastSsid = WIFI_STORE.getLastConnectedSsid();
   const auto credential = WIFI_STORE.findCredential(lastSsid);
@@ -291,6 +292,10 @@ bool AirPageConnection::startWifiAssociation() {
 
 void AirPageConnection::teardownWifi() {
   if (!ownsWifi_) return;
+  if (externalWifiOwner_) {
+    ownsWifi_ = false;
+    return;
+  }
   WiFi.disconnect(false);
   delay(100);
   WiFi.mode(WIFI_OFF);

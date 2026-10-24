@@ -25,6 +25,8 @@ cmake -S test -B build/test -G Ninja -DCMAKE_BUILD_TYPE=Release
 cmake --build build/test
 ctest --test-dir build/test --output-on-failure -j
 python3 freeink-sdk/libs/display/EpdiyLcd/test/host/test_transactions.py
+python3 test/test_papers3_port.py
+python3 test/test_hal_power_sources.py
 
 echo "Local CI checks passed."
 echo "Remember to use a semantic PR title, for example: fix: handle malformed epub"

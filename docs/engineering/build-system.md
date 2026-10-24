@@ -66,6 +66,7 @@ prebuilt `dio_opi` core continues to supply the TinyUSB CDC/MSC component graph.
   * `x4pro`: Xteink X4 Pro ESP32-S3 development build
   * `x4c`: Xteink X4 Classic ESP32-S3 build-only development build
   * `papermono`: M5Stack PaperMono ESP32-S3 development build
+  * `papers3`: M5Stack PaperS3 ESP32-S3 experimental development build (`qio_opi`, separate from Paper Mono)
   * `eego_a4`: eego A4 ESP32-S3 development build
   * `murphy_m4`: Murphy M4 ESP32-S3 experimental development build
   * `waveshare_epaper_397`: Waveshare ePaper 3.97 ESP32-S3 experimental development build
@@ -81,7 +82,7 @@ prebuilt `dio_opi` core continues to supply the TinyUSB CDC/MSC component graph.
 The S3 environments are separate hardware binaries, each with unified languages.
 Inspect `bin/ci-check` and current workflow matrices for validation coverage;
 published targets and channels come from `scripts/nightly_targets.py`.
-X4 Classic and LilyGo development builds do not join the public Nightly/OTA set.
+X4 Classic, LilyGo and PaperS3 development builds do not join the public Nightly/OTA set.
 
 Routine pull-request CI builds only `default` and `x4pro`. `default` remains the
 shared X3/X4 firmware with runtime device detection. The path-filtered Hardware

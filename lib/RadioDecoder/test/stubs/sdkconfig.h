@@ -1,0 +1,2 @@
+#pragma once
+#define CONFIG_FREERTOS_TASK_CREATE_ALLOW_EXT_MEM 1

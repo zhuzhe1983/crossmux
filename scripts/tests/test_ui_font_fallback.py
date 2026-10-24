@@ -277,7 +277,7 @@ int main() {
         with tempfile.TemporaryDirectory(prefix='missing-outline-') as directory:
             cpp = Path(directory) / 'check.cpp'
             exe = Path(directory) / 'check'
-            cpp.write_text(program)
+            cpp.write_text('#ifdef __clang__\n#pragma clang diagnostic ignored "-Wnon-c-typedef-for-linkage"\n#endif\n' + program)
             subprocess.run(['c++', '-std=c++20', '-Wall', '-Wextra', '-Werror',
                             '-I', str(ROOT / 'lib/EpdFont'), '-I', str(ROOT / 'lib/Utf8'),
                             '-I', str(ROOT / 'lib/MiniBidi'), str(cpp), '-o', str(exe)], check=True)
@@ -634,7 +634,7 @@ int main() {
         with tempfile.TemporaryDirectory(prefix='ui-fallback-') as directory:
             cpp = Path(directory) / 'check.cpp'
             exe = Path(directory) / 'check'
-            cpp.write_text(program)
+            cpp.write_text('#ifdef __clang__\n#pragma clang diagnostic ignored "-Wnon-c-typedef-for-linkage"\n#endif\n' + program)
             for name, defines, enabled in configurations:
                 with self.subTest(target=name):
                     subprocess.run(['c++', '-std=c++20', '-Wall', '-Wextra', '-Werror',

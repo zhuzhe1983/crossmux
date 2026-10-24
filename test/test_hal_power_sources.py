@@ -50,7 +50,7 @@ int main() {
  frames=false;assert(!gpio.isUsbConnected());
 #endif
  bootOnUsb(gpio);
-#if FREEINK_DEVICE_LILYGO || FREEINK_DEVICE_METALIO_EINK4
+#if FREEINK_DEVICE_LILYGO || FREEINK_DEVICE_METALIO_EINK4 || FREEINK_DEVICE_PAPERS3
  assert(!Storage.stopped);
 #else
  assert(Storage.stopped);
@@ -59,13 +59,14 @@ int main() {
 """
     with tempfile.TemporaryDirectory(prefix="hal-power-") as directory:
         tmp=Path(directory);(tmp/"check.cpp").write_text(harness)
-        for metalio,lilygo in ((0,0),(0,1),(1,0)):
-            binary=tmp/f"check-{metalio}-{lilygo}"
+        for metalio,lilygo,papers3 in ((0,0,0),(0,1,0),(1,0,0),(0,0,1)):
+            binary=tmp/f"check-{metalio}-{lilygo}-{papers3}"
             subprocess.run(["c++","-std=c++17",f"-DFREEINK_DEVICE_METALIO_EINK4={metalio}",
-                            f"-DFREEINK_DEVICE_LILYGO={lilygo}",str(tmp/"check.cpp"),"-o",str(binary)],check=True,
+                            f"-DFREEINK_DEVICE_LILYGO={lilygo}",f"-DFREEINK_DEVICE_PAPERS3={papers3}",
+                            str(tmp/"check.cpp"),"-o",str(binary)],check=True,
                            env=dict(os.environ,CCACHE_DISABLE="1"))
             subprocess.run([str(binary)],check=True)
-    print("Metalio authoritative/unknown power and USB SOF fallback; LilyGo USB cold boot passed")
+    print("Metalio power/SOF fallback; LilyGo and PaperS3 USB cold boot passed")
 
 
 def sleep_order():

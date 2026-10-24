@@ -994,3 +994,30 @@ with a valid marker restores the old image/mode before clearing the marker;
 malformed markers and failed rollback preserve recovery files. Legacy `.bak`
 files without a marker remain recoverable. Existing font, book, paging and
 settings binary layouts are unchanged.
+
+## Experimental chat persistence
+
+RF and Tox retain their existing `messages-v1.txt` records. ESP-NOW uses a
+separate `/.crosspoint/esp_chat/messages-v2.txt`:
+
+```text
+\n<room>|<sequence-hex>|<delivery>|<sender-MAC>|<receipt-count>|<UTF-8 text>\n
+```
+
+Room is `*` or `G` plus six digits (000001–999999). Sender is exactly twelve
+hexadecimal digits, receipt count is 0–8, and text is 1–192 bytes with no control
+characters. Delivery codes remain Received=0, Pending=1, Sent=2, Delivered=3,
+Failed=4. Pending records reload as Failed. Outgoing updates coalesce by room
+and sequence; incoming messages remain separate. Records start with a newline
+so a torn last record cannot absorb the next write. Logs rotate at 128 KiB to
+`messages-v2.previous.txt`; the RAM window retains 24 messages.
+
+`esp_chat/groups-v1.txt` contains at most eight records, each exactly six decimal
+digits plus newline, without zero or duplicate group numbers. Replacements use
+`groups-v1.part` and atomic file replacement.
+
+`/.crosspoint/chat-background-v2.txt` is four bytes: RF, Tox and ESP-NOW enable
+flags (`0`/`1`) followed by newline. If absent, the old three-byte
+`chat-background-v1.txt` loads RF/Tox settings and leaves ESP-NOW disabled.
+Malformed files leave listeners disabled. Writes use a sibling `.part` file.
+These versioned chat files do not alter reader caches or Tox identity files.

@@ -14,6 +14,7 @@
 #include "components/UITheme.h"
 #include "components/UiAppHelpers.h"
 #include "components/icons/inx_apps.h"
+#include "system/SystemMessages.h"
 #ifdef CROSSMUX_UI_PROFILE_HIGH_DPI
 #include "components/icons/uiChromeIcons.h"
 #else
@@ -142,6 +143,8 @@ void InxTheme::drawHeader(const GfxRenderer& renderer, const Rect rect, const ch
     renderer.drawText(titleFont, rect.x + kRowPadding, titleTop, title, true, EpdFontFamily::BOLD);
   }
   renderer.drawLine(rect.x, rect.y + rect.height - 1, rect.x + rect.width - 1, rect.y + rect.height - 1, true);
+  // CrossStore and protocol services share the system inbox.
+  systemMessages::drawBadge(renderer, rect);
 }
 
 void InxTheme::drawSubHeader(const GfxRenderer& renderer, const Rect rect, const char* label,
@@ -482,4 +485,6 @@ void InxTheme::drawMainTabStatusBar(const GfxRenderer& renderer, const Rect rect
   drawBatteryRight(renderer, Rect{right - metrics.batteryWidth, textY, metrics.batteryWidth, metrics.batteryHeight},
                    SETTINGS.hideBatteryPercentage != CrossPointSettings::HIDE_BATTERY_PERCENTAGE::HIDE_ALWAYS,
                    numericFontId);
+  // CrossStore and protocol services share the system inbox.
+  systemMessages::drawBadge(renderer, rect);
 }

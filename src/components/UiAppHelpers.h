@@ -14,6 +14,7 @@
 #include "components/icons/customListIcons.h"
 #include "components/icons/inx_apps.h"
 #include "components/icons/listIcons.h"
+#include "components/icons/settingsListIcons.h"
 #ifdef CROSSMUX_UI_PROFILE_HIGH_DPI
 #include "components/icons/listIcons48.h"
 #include "components/icons/uiChromeIcons.h"
@@ -125,6 +126,8 @@ inline freeink::ui::BitmapRef listIconFor(const UIIcon icon, const int size = 24
 #endif
   if (size >= 32) {
     switch (icon) {
+      case UIIcon::Settings:
+        return freeink::ui::bitmapFromIcon(icon_settings_32);
       case UIIcon::Folder:
         return freeink::ui::bitmapFromIcon(icon_folder_32);
       case UIIcon::Text:
@@ -161,6 +164,8 @@ inline freeink::ui::BitmapRef listIconFor(const UIIcon icon, const int size = 24
     }
   }
   switch (icon) {
+    case UIIcon::Settings:
+      return freeink::ui::bitmapFromIcon(icon_settings_24);
     case UIIcon::Folder:
       return freeink::ui::bitmapFromIcon(icon_folder_24);
     case UIIcon::Text:

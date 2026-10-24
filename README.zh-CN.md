@@ -36,6 +36,8 @@
 
 此表表示配置中的发布目标，不代表所有功能均已通过实机验收。每个 S3 目标使用独立固件。X4 Classic（`x4c`）和 [LilyGo T5 S3 4.7 PRO/Lite](./docs/engineering/lilygo-t5s3.md)（`lilygo_t5s3`）提供开发构建目标，均不加入公开 Nightly 与 OTA 索引。各设备限制见[设备变体说明](./docs/engineering/device-variants.md)。
 
+[M5Stack PaperS3](./docs/engineering/papers3.md) 提供实验性开发构建（`pio run -e papers3`），与 Paper Mono 使用不同固件。v1.0 实机已通过基础显示、触摸、EPUB 阅读和两次休眠恢复测试，其余验收项目仍待完成。原生 16 级灰阶尚未接入，暂不加入公开 Nightly 与 OTA 索引。
+
 X3/X4 稳定渠道使用 [Stable](https://github.com/0x1abin/crossmux/releases/tag/stable)，开发版本使用 [Nightly](https://github.com/0x1abin/crossmux/releases/tag/nightly)。[目标表](./scripts/nightly_targets.py) 定义渠道与产物名称；[发布架构](./docs/engineering/firmware-release.md) 说明打包与 OTA。当前源码版本及构建环境以 [platformio.ini](./platformio.ini) 为准。
 
 ## 安装固件

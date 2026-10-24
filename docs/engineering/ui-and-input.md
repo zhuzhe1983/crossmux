@@ -68,6 +68,22 @@ In the main Settings menu, short presses move one item while a held
 continuous-navigation interval. Settings subpages retain their own input
 semantics.
 
+On PaperMono, the installed-app icon grid and AppStore browser use logical
+`Up` / `Down` press edges for previous / next page. Holding or releasing the
+same key does not repeat the turn. Page boundaries do not wrap; a single-page
+grid does not move an icon selection instead. The installed-app grid keeps its
+last page partially filled, and vertical swipes use the same fixed page size.
+Lists, AppStore details/settings and other boards retain their existing navigation.
+
+Lua API 8 adds optional `on_key(_, direction)` for logical `Up` / `Down` presses,
+with `direction` equal to `up` or `down`. Only a boolean `true` claims the complete
+press/hold/release gesture; absent callbacks, `false` and `nil` retain default
+navigation. Inherited holds on entry or after a keyboard/Wi-Fi child are consumed,
+while touch remains independent. AirTune 0.1.2 uses this on its Playing page for
+volume +10 / -10, clamped to 0–100; its other pages keep standard navigation.
+Run `test/crossstore/test_grid_page_keys.py`, `test_store_grid.py` and
+`test_lua_keys.py` in the same directory for the production input regressions.
+
 ## Activity and Popup Transitions
 
 An Activity, popup, and resumed parent are separate input owners. If ownership

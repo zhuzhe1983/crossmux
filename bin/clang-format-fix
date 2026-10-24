@@ -53,6 +53,7 @@ fi
 # --exclude-standard: ignores files in .gitignore
 # Additionally exclude files in 'lib/EpdFont/builtinFonts/' as they are script-generated.
 # Also exclude files in 'lib/Epub/Epub/hyphenation/generated/' as they are script-generated.
+# Preserve upstream Lua/minimp3 sources and the generated semantic-icon headers.
 # Keep the no-match case non-fatal: grep returns 1 when no files match,
 # which is expected when there are no modified C/C++ files.
 set +o pipefail
@@ -62,6 +63,9 @@ git ls-files --exclude-standard ${GIT_LS_FILES_FLAG:+"${GIT_LS_FILES_FLAG}"} \
     | grep -v -E '^lib/Epub/Epub/hyphenation/generated/' \
     | grep -v -E '^lib/uzlib/' \
     | grep -v -E '^lib/miniz/third_party/' \
+    | grep -v -E '^lib/CrossStoreLua/src/' \
+    | grep -v -E '^lib/RadioDecoder/vendor/' \
+    | grep -v -E '^assets/app-icons/semantic-v1/g(2|4|16)/[0-9]+/(plain|dither)/icons\.h$' \
     | while IFS= read -r file; do
         # Unstaged deletions are still returned by git ls-files.
         if [[ -f "${file}" ]]; then

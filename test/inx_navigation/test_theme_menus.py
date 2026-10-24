@@ -447,7 +447,7 @@ struct UiListActivity {
  bool defersContentSelection()const{return true;}
  fui::ListNav& activeNav(){return nav;}
  int listCount()const{return count;}
- void syncPagedViewport(int);
+ void syncPagedViewport(int, bool allowPartialPage=false);
  void syncListViewport(UiScreen&,fui::ListProps&,int selectionOffset=0);
 };
 ''' + sync + sync_list + r'''
@@ -588,7 +588,7 @@ struct UiListActivity {
  bool hasContentSelection()const{return selection && count>0;}
  void requestUpdate(){++updates;}
  bool handleListSwipe(MappedInputManager::SwipeDir,int,int);
- void syncPagedViewport(int);
+ void syncPagedViewport(int, bool allowPartialPage=false);
 };
 struct InxRecentActivity : UiListActivity {
  InxRecentLayout chosen=InxRecentLayout::Flow;

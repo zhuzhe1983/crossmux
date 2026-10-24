@@ -212,7 +212,10 @@ int main() {
                     self.assertIn("--wrap=xTaskCreatePinnedToCore", flags)
                     self.assertNotIn("configure_c3_ble_controller.py", scripts)
                     self.assertFalse(resolve(section, "custom_nimble_config"))
-                    if "FREEINK_CAP_USB_MSC=1" in flags or "FREEINK_DEVICE_LILYGO=1" in flags:
+                    if "FREEINK_DEVICE_PAPERS3=1" in flags:
+                        self.assertFalse(resolve(section, "custom_sdkconfig"))
+                        self.assertEqual(resolve(section, "board_build.arduino.memory_type"), "qio_opi")
+                    elif "FREEINK_CAP_USB_MSC=1" in flags or "FREEINK_DEVICE_LILYGO=1" in flags:
                         self.assertFalse(resolve(section, "custom_sdkconfig"))
                         self.assertEqual(resolve(section, "board_build.arduino.memory_type"), "dio_opi")
                     else:

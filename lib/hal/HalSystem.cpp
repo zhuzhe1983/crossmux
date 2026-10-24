@@ -1,6 +1,7 @@
 #include "HalSystem.h"
 
 #include <BoardConfig.h>
+#include <soc/soc_caps.h>
 
 #include <string>
 
@@ -20,6 +21,14 @@
 #endif
 
 #define MAX_PANIC_STACK_DEPTH 32
+bool HalSystem::supportsWifi() {
+#if SOC_WIFI_SUPPORTED
+  return true;
+#else
+  return false;
+#endif
+}
+bool HalSystem::hasConfiguredMicrophone() { return BoardConfig::hasMic(); }
 #define PANIC_CAPTURE_MAGIC 0x50414E49u
 
 RTC_NOINIT_ATTR char panicMessage[256];

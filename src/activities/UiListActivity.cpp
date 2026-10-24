@@ -302,11 +302,19 @@ void UiListActivity::syncListViewport(UiScreen& screen, fui::ListProps& props, c
   }
 }
 
-void UiListActivity::syncPagedViewport(const int pageItems) {
+void UiListActivity::syncPagedViewport(const int pageItems, const bool allowPartialPage) {
   auto& n = activeNav();
   fui::ListProps props;
   const int rows = std::max(1, pageItems);
-  n.syncToProps(fui::Rect{0, 0, 1, static_cast<int16_t>(rows)}, 1, 0, listCount(), props);
+  const int count = listCount();
+  // ListNav normally fills the tail viewport, which makes fixed grid pages
+  // overlap. Pad only the layout extent; drawing/activation keep the real count.
+  const int layoutCount = allowPartialPage ? ((count + rows - 1) / rows) * rows : count;
+  if (allowPartialPage) {
+    int selected = n.selected.load();
+    if (selected >= count) n.selected.compare_exchange_strong(selected, std::max(0, count - 1));
+  }
+  n.syncToProps(fui::Rect{0, 0, 1, static_cast<int16_t>(rows)}, 1, 0, layoutCount, props);
   n.drawnCount = listCount();
   n.onListRendered(props.topIndex, std::min(rows, std::max(0, listCount() - n.top)),
                    props.selectedIndex >= n.top && props.selectedIndex < n.top + rows);
@@ -346,6 +354,7 @@ void UiListActivity::render(RenderLock&&) {
   }
   const auto scanned = millis();
   // Bitmap targets can write pixels during scanning; discard that temporary paint.
+  beginDisplayFrame();
   renderer.clearScreen();
   drawChrome();
   renderUi();
@@ -361,7 +370,7 @@ void UiListActivity::render(RenderLock&&) {
   }
   drawFooter();
   const auto painted = millis();
-  renderer.displayBuffer();
+  displayFrame();
   LOG_DBG("LIST", "%s scan=%lu paint=%lu display=%lu ms", name.c_str(), scanned - started, painted - scanned,
           millis() - painted);
 }

@@ -23,6 +23,13 @@ class ControlCenterGestureTest(unittest.TestCase):
 #include <string>
 #include "activities/MainTab.h"
 #define LOG_ERR(...) ((void)0)
+struct RenderLock {};
+unsigned long millis() { return 0; }
+namespace systemMessages {
+  inline unsigned revision() { return 0; }
+  inline bool hit(int, int) { return false; }
+  inline void clearHit() {}
+}
 namespace haptic_feedback { void touchAction() {} }
 enum { eIncrement };
 void xTaskNotify(int, int, int) {}
@@ -51,6 +58,7 @@ struct Input {
   bool wasLightPanelGesture() { return light && topSwipe; }
   bool wasMenuGesture() { return topSwipe; }
 };
+struct SystemMessagesActivity { SystemMessagesActivity(int, Input&) {} };
 struct FrontlightPanelActivity { FrontlightPanelActivity(int, Input&) {} };
 bool failAllocation = false;
 template<class T, class... Args> std::unique_ptr<T> makeUniqueNoThrow(Args&&... args) {
@@ -70,6 +78,8 @@ struct ActivityManager {
   void pushActivity(std::unique_ptr<FrontlightPanelActivity>) {
     ++pushes; pendingAction = PendingAction::Push;
   }
+  void requestUpdate() { requestedUpdate=true; }
+  void pushActivity(std::unique_ptr<SystemMessagesActivity>) { assert(false); }
   void loop();
 };
 '''

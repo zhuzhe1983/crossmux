@@ -163,6 +163,8 @@ add_test(NAME InxRecentThumbnails
 
 add_test(NAME UiFontFallback
   COMMAND ${Python3_EXECUTABLE} ${REPO_ROOT}/scripts/tests/test_ui_font_fallback.py)
+add_test(NAME UsbFontHandoff
+  COMMAND ${Python3_EXECUTABLE} ${REPO_ROOT}/scripts/tests/test_usb_font_handoff.py)
 add_subdirectory(content_opf_parser)
 add_subdirectory(chapter_position)
 add_subdirectory(home_button)
@@ -254,4 +256,63 @@ add_test(NAME TxtCoverCopy
 add_test(NAME CjkGenerationTransaction COMMAND ${Python3_EXECUTABLE} ${REPO_ROOT}/scripts/tests/test_cjk_generation_transaction.py)
 add_test(NAME PowerConfirmRelease COMMAND ${Python3_EXECUTABLE} ${REPO_ROOT}/test/test_power_confirm_release.py ${crosspoint_simulator_SOURCE_DIR})
 
+add_subdirectory(chat)
 add_subdirectory(persistable_store)
+
+add_test(NAME CrossStoreRuntime
+  COMMAND ${Python3_EXECUTABLE} ${REPO_ROOT}/test/crossstore/test_runtime.py)
+add_test(NAME CrossStoreCatalog
+  COMMAND ${Python3_EXECUTABLE} ${REPO_ROOT}/test/crossstore/test_catalog.py)
+add_test(NAME CrossStoreGrid
+  COMMAND ${Python3_EXECUTABLE} ${REPO_ROOT}/test/crossstore/test_store_grid.py)
+add_test(NAME CrossStoreRefresh
+  COMMAND ${Python3_EXECUTABLE} ${REPO_ROOT}/test/crossstore/test_store_refresh.py)
+add_test(NAME HalDnsGuard
+  COMMAND ${Python3_EXECUTABLE} ${REPO_ROOT}/test/dns_guard/test_dns_guard.py)
+add_test(NAME CrossStoreLuaKeys
+  COMMAND ${Python3_EXECUTABLE} ${REPO_ROOT}/test/crossstore/test_lua_keys.py)
+add_test(NAME CrossStoreGridPageKeys
+  COMMAND ${Python3_EXECUTABLE} ${REPO_ROOT}/test/crossstore/test_grid_page_keys.py)
+add_test(NAME CrossStoreDetails
+  COMMAND ${Python3_EXECUTABLE} ${REPO_ROOT}/test/crossstore/test_store_details.py)
+add_test(NAME CrossStoreConfirmation
+  COMMAND ${Python3_EXECUTABLE} ${REPO_ROOT}/test/crossstore/test_store_confirmation.py)
+add_test(NAME CrossStoreUninstall
+  COMMAND ${Python3_EXECUTABLE} ${REPO_ROOT}/test/uninstall/test_uninstall.py)
+add_test(NAME CrossStorePackageIcons
+  COMMAND ${Python3_EXECUTABLE} ${REPO_ROOT}/test/crossstore/test_package_icons.py)
+add_test(NAME CrossStoreCatalogCache
+  COMMAND ${Python3_EXECUTABLE} ${REPO_ROOT}/test/store_catalog/test_store_catalog.py)
+add_test(NAME CrossStoreRadioAdapter
+  COMMAND ${Python3_EXECUTABLE} ${REPO_ROOT}/test/radio_service/test_lua_service.py)
+add_test(NAME CrossStoreWeReadCovers
+  COMMAND ${Python3_EXECUTABLE} ${REPO_ROOT}/test/weread_covers/test_covers.py)
+add_test(NAME CrossStoreWeReadService
+  COMMAND ${Python3_EXECUTABLE} ${REPO_ROOT}/test/weread_covers/test_service.py)
+add_test(NAME BuzzerPcmStream
+  COMMAND ${Python3_EXECUTABLE} ${REPO_ROOT}/test/buzzer_pcm/test_stream.py)
+add_test(NAME RadioMp3Decoder
+  COMMAND ${Python3_EXECUTABLE} ${REPO_ROOT}/lib/RadioDecoder/test/test_radio.py)
+# CrossStore is a separate source repository. Enable integration tests when a
+# checkout is available; firmware-only CI still runs the sandbox/catalog tests.
+set(CROSSSTORE_PACKAGES_DIR "${REPO_ROOT}/../CrossStore/packages" CACHE PATH "CrossStore application sources")
+if(EXISTS "${CROSSSTORE_PACKAGES_DIR}/sudoku/main.lua" AND EXISTS "${CROSSSTORE_PACKAGES_DIR}/gomoku/main.lua")
+  add_test(NAME CrossStoreGames
+    COMMAND ${Python3_EXECUTABLE} ${REPO_ROOT}/test/crossstore/test_game_migration.py ${CROSSSTORE_PACKAGES_DIR})
+endif()
+if(EXISTS "${CROSSSTORE_PACKAGES_DIR}/reading_stats/main.lua")
+  add_test(NAME CrossStoreReadingStats
+    COMMAND ${Python3_EXECUTABLE} ${REPO_ROOT}/test/crossstore/test_reading_stats_migration.py ${CROSSSTORE_PACKAGES_DIR}/reading_stats/main.lua)
+endif()
+if(EXISTS "${CROSSSTORE_PACKAGES_DIR}/weread/main.lua")
+  add_test(NAME CrossStoreWeReadCache
+    COMMAND ${Python3_EXECUTABLE} ${REPO_ROOT}/test/weread_cache/test_weread_cache.py ${CROSSSTORE_PACKAGES_DIR}/weread/main.lua)
+endif()
+add_test(NAME buzzer_pcm
+  COMMAND ${Python3_EXECUTABLE} ${REPO_ROOT}/test/buzzer_pcm/test_buzzer.py)
+
+if(EXISTS "${CROSSSTORE_PACKAGES_DIR}/airtune/tests/test_runtime.py")
+  add_test(NAME CrossStoreAirTune
+    COMMAND ${CMAKE_COMMAND} -E env "CROSSMUX_ROOT=${REPO_ROOT}" ${Python3_EXECUTABLE}
+      ${CROSSSTORE_PACKAGES_DIR}/airtune/tests/test_runtime.py)
+endif()

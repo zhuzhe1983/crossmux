@@ -43,6 +43,7 @@ bool AppVisibilitySettingsActivity::handleCustomInput() {
 
 void AppVisibilitySettingsActivity::activateIndex(const int index) {
   if (index < 0 || index >= listCount()) return;
+  if (!AppsMenuActivity::isAppSupported(index)) return;
   nav.selected = index;
   app.clearTapFlash();
   const bool visible = AppsMenuActivity::isAppVisible(index);
@@ -61,7 +62,9 @@ void AppVisibilitySettingsActivity::buildScreen(UiScreen& screen) {
   screen.spacer(static_cast<int16_t>(metrics.verticalSpacing));
 
   for (int i = 0; i < listCount(); ++i) {
-    rowItems[static_cast<size_t>(i)].value = AppsMenuActivity::isAppVisible(i) ? tr(STR_STATE_ON) : tr(STR_STATE_OFF);
+    rowItems[static_cast<size_t>(i)].value = !AppsMenuActivity::isAppSupported(i) ? tr(STR_CHAT_UNSUPPORTED)
+                                             : AppsMenuActivity::isAppVisible(i)  ? tr(STR_STATE_ON)
+                                                                                  : tr(STR_STATE_OFF);
   }
 
   fui::ListProps props;

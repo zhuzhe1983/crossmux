@@ -80,6 +80,9 @@ class UiListActivity : public Activity, protected UiAppHost {
   virtual void drawChrome();
   // Button hints, drawn after the app renders. Default: Back/Select/Up/Down.
   virtual void drawFooter();
+  // Optional native/overlay frame transaction, outside the font scan pass.
+  virtual void beginDisplayFrame() {}
+  virtual void displayFrame() { renderer.displayBuffer(); }
 
   // --- helpers ---------------------------------------------------------------
   // Measure visibleRows for the screen band, apply follow-on-build, clamp the
@@ -91,7 +94,8 @@ class UiListActivity : public Activity, protected UiAppHost {
   // Move the selection to index and pull the viewport to it.
   void moveSelectionTo(int index);
   // Custom grids publish their slot capacity through the same viewport owner.
-  void syncPagedViewport(int pageItems);
+  // Fixed grid pages may leave their final page partially filled.
+  void syncPagedViewport(int pageItems, bool allowPartialPage = false);
   void clearContentSelection();
   void establishContentSelection(int index);
   bool showMainTabContentSelection() const override;

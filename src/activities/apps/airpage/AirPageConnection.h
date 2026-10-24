@@ -31,7 +31,8 @@ class AirPageConnection final {
     PushRequested,
   };
 
-  explicit AirPageConnection(GfxRenderer& renderer) : renderer_(renderer), mqtt_(mqttNet_) {}
+  explicit AirPageConnection(GfxRenderer& renderer, bool externalWifiOwner = false)
+      : externalWifiOwner_(externalWifiOwner), renderer_(renderer), mqtt_(mqttNet_) {}
 
   Event begin(bool realtime);
   void stop();
@@ -58,6 +59,7 @@ class AirPageConnection final {
   Event pause(Event event);
 
   bool realtime_ = false;
+  const bool externalWifiOwner_;
   bool ownsWifi_ = false;
   State state_ = State::Off;
   uint8_t retryCount_ = 0;

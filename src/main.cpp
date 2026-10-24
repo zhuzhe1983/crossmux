@@ -4,6 +4,7 @@
 #include <FontCacheManager.h>
 #include <FontDecompressor.h>
 #include <GfxRenderer.h>
+#include <HalBuzzer.h>
 #include <HalClock.h>
 #include <HalDisplay.h>
 #include <HalFrontlight.h>
@@ -86,6 +87,36 @@ static unsigned long lastX4ProPowerClickAt = 0;
 namespace {
 constexpr unsigned long X4PRO_POWER_DOUBLE_CLICK_MS = 500;
 constexpr unsigned long X4PRO_POWER_CLICK_MAX_HOLD_MS = 300;
+
+void writeCrashReportToSerial() {
+  // Fixed diagnostic file only. Stream bounded chunks instead of allocating a
+  // report-sized string on the shared internal heap or task stack.
+  auto file = Storage.open("/crash_report.txt");
+  if (!file || file.isDirectory()) {
+    logSerial.printf("CRASH_REPORT_ERROR:missing\n");
+    return;
+  }
+  constexpr size_t MAX_REPORT_BYTES = 32 * 1024;
+  const size_t size = file.size();
+  if (size > MAX_REPORT_BYTES) {
+    logSerial.printf("CRASH_REPORT_ERROR:too_large\n");
+    return;
+  }
+  logSerial.printf("CRASH_REPORT_START:%u\n", static_cast<unsigned>(size));
+  uint8_t buffer[128];
+  size_t remaining = size;
+  while (remaining) {
+    const size_t requested = remaining < sizeof(buffer) ? remaining : sizeof(buffer);
+    const int received = file.read(buffer, requested);
+    if (received <= 0 || logSerial.write(buffer, static_cast<size_t>(received)) != static_cast<size_t>(received)) {
+      logSerial.printf("\nCRASH_REPORT_ERROR:read_or_transport\n");
+      return;
+    }
+    remaining -= static_cast<size_t>(received);
+  }
+  logSerial.printf("\nCRASH_REPORT_END\n");
+}
+
 #if CROSSPOINT_CAP_SOUND_FEEDBACK
 static_assert(CrossPointSettings::SOUND_FEEDBACK_OFF == static_cast<uint8_t>(SoundFeedback::Level::Off));
 static_assert(CrossPointSettings::SOUND_FEEDBACK_LOW == static_cast<uint8_t>(SoundFeedback::Level::Low));
@@ -500,6 +531,7 @@ void enterDeepSleep(bool fromTimeout = false) {
   Frontlight.setOn(false);
 #if CROSSPOINT_CAP_SOUND_FEEDBACK
   SoundFeedback::shutdown();
+  HalBuzzer::shutdown();
 #endif
   display.deepSleep();
   Storage.prepareForDeepSleep();
@@ -870,7 +902,7 @@ void setup() {
       LOG_DBG("MAIN", "Wakeup reason: After USB Power");
 #if FREEINK_DEVICE_X4PRO || FREEINK_DEVICE_X4CLASSIC || FREEINK_DEVICE_PAPERMONO || FREEINK_DEVICE_EEGO_A4 || \
     FREEINK_DEVICE_WAVESHARE_EPAPER_397 || FREEINK_DEVICE_METALIO_EINK4 || FREEINK_DEVICE_READPICO ||         \
-    FREEINK_DEVICE_LILYGO
+    FREEINK_DEVICE_LILYGO || FREEINK_DEVICE_PAPERS3
       // X4 Pro must stay awake so USB Serial/JTAG remains available after leaving
       // USB Drive and reconnecting the cable. Paper Mono has no armable GPIO wake
       // (its button is behind the PMIC). Metalio also needs native USB available
@@ -885,6 +917,8 @@ void setup() {
       // wake sources are the PMU key / AC-in / RTC alarm — so a cabled boot with a
       // charging battery (isUsbConnected() reads the PMU charge state) would drop
       // the EN rail immediately and look like a boot loop to the user.
+      // PaperS3 also has a PMU-owned side button and must remain accessible on
+      // USB; its shutdown pulse can restart the board while USB supplies power.
       break;
 #else
       Storage.prepareForDeepSleep();
@@ -1132,6 +1166,16 @@ void loop() {
         uint8_t* buf = display.getFrameBuffer();
         logSerial.write(buf, bufferSize);
         logSerial.printf("SCREENSHOT_END\n");
+      } else if (cmd == "CRASH_REPORT") {
+        writeCrashReportToSerial();
+      } else if (cmd == "USB_DRIVE") {
+#if FREEINK_CAP_USB_MSC
+        logSerial.printf("USB_DRIVE_OPENING\n");
+        activityManager.goToUsbDrive();
+        return;
+#else
+        logSerial.printf("USB_DRIVE_ERROR:unsupported\n");
+#endif
       }
     }
   }

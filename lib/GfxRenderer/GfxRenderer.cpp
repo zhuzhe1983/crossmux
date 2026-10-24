@@ -1815,7 +1815,9 @@ void GfxRenderer::cancelGrayscale16() const {
 }
 
 void GfxRenderer::drawGrayscale16Pixel(const int x, const int y, const uint8_t gray) const {
-  if (!grayscale16Buffer || x < 0 || y < 0 || x >= getScreenWidth() || y >= getScreenHeight()) return;
+  if (!grayscale16Buffer || x < 0 || y < 0 || x >= getScreenWidth() || y >= getScreenHeight() || x < clipLeft_ ||
+      y < clipTop_ || x >= clipRight_ || y >= clipBottom_)
+    return;
   int px, py;
   rotateCoordinates(orientation, x, y, &px, &py, panelWidth, panelHeight);
   const size_t index = static_cast<size_t>(py) * (panelWidth / 2) + px / 2;
@@ -2152,6 +2154,17 @@ void GfxRenderer::clearScreen(const uint8_t color) const {
     return;
   }
   display.clearScreen(color);
+  if (grayscale16Buffer) {
+    const size_t bytes = static_cast<size_t>(panelWidth) * panelHeight / 2;
+    if (color == 0xFF || color == 0) {
+      memset(grayscale16Buffer, color, bytes);
+    } else {
+      for (size_t i = 0; i < bytes; ++i) {
+        const unsigned bit = 7 - (i % 4) * 2;
+        grayscale16Buffer[i] = ((color >> bit) & 1 ? 0x0F : 0) | ((color >> (bit - 1)) & 1 ? 0xF0 : 0);
+      }
+    }
+  }
 }
 
 void GfxRenderer::beginStripTarget(uint8_t* scratch, int stripY0, int stripRows) const {

@@ -286,6 +286,15 @@ int main(int argc, char** argv) {
                                  GfxRenderer::LandscapeCounterClockwise}) {
     renderer.setOrientation(orientation);
     assert(renderer.beginGrayscale16());
+    renderer.drawGrayscale16Pixel(0, 0, 85);
+    renderer.clearScreen();
+    for (const auto value : native) assert(value == 0xFF);
+    {
+      const GfxRenderer::ClipScope clip(renderer, 1, 1, 2, 2);
+      renderer.drawGrayscale16Pixel(0, 0, 0);
+      const auto [px, py] = physical(orientation, 0, 0);
+      assert(tone(px, py) == 15);
+    }
     renderer.fillRect(0, 0, 3, 2);
     for (int y = 0; y < renderer.getScreenHeight(); ++y) {
       for (int x = 0; x < renderer.getScreenWidth(); ++x) {

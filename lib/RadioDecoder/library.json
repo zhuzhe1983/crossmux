@@ -1,0 +1,7 @@
+{
+  "name": "RadioDecoder",
+  "version": "0.1.0",
+  "description": "On-demand MP3-only minimp3 decoder and fixed-rate mono conversion",
+  "license": "CC0-1.0",
+  "build": { "srcFilter": ["+<*.cpp>", "-<test/>", "-<vendor/>"] }
+}

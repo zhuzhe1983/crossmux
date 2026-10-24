@@ -56,7 +56,7 @@ constexpr const char* IMAGE_PREVIEW_PATH = "/.crosspoint/image_preview.bmp";
 constexpr const char* TRANSPARENT_PREVIEW_PATH = "/.crosspoint/image_preview.transparent.bmp";
 constexpr const char* SLEEP_IMAGE_PATH = "/sleep.bmp";
 constexpr const char* SLEEP_IMAGE_PART_PATH = "/sleep.bmp.part";
-constexpr const char* SLEEP_IMAGE_BACKUP_PATH = "/sleep.bmp.bak";
+[[maybe_unused]] constexpr const char* SLEEP_IMAGE_BACKUP_PATH = "/sleep.bmp.bak";
 struct Entry { std::string name; bool directory = false; };
 std::vector<Entry> entries;
 struct HalFile {

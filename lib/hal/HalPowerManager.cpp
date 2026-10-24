@@ -7,6 +7,9 @@
 #if FREEINK_DEVICE_READPICO
 #include <BoardReadPico.h>
 #endif
+#if FREEINK_DEVICE_PAPERS3
+#include <BoardPaperS3.h>
+#endif
 #include <Logging.h>
 #include <PowerManager.h>
 #include <WiFi.h>
@@ -161,10 +164,16 @@ HalPowerManager::LightSleepWakeReason lightSleepReadPico(const uint32_t seconds)
 }  // namespace
 
 void HalPowerManager::begin() {
+#if FREEINK_DEVICE_PAPERS3
+  // No ESP-readable power key or RTC-capable touch interrupt exists on PaperS3.
+  // Hand off to the PMS150G instead of entering deep sleep without a wake source.
+  // The SDK idles if USB prevents the pulse train from cutting host power.
+  freeink::PowerManager::setHostShutdownHook(&BoardPaperS3::powerOff);
+#endif
 #if FREEINK_DEVICE_READPICO
   // Board-owned shutdown path, installed once the board is up (HalGPIO::begin()
-  // ran before this). Every other target leaves the hook unset and keeps the
-  // existing esp_deep_sleep_start() behaviour byte-for-byte.
+  // ran before this). Targets without a host-shutdown hook keep the existing
+  // esp_deep_sleep_start() behaviour.
   freeink::PowerManager::setHostShutdownHook(&readPicoHostShutdown);
 #endif
 #if FREEINK_DEVICE_WAVESHARE_EPAPER_397
@@ -224,15 +233,15 @@ void HalPowerManager::startDeepSleep(HalGPIO& gpio) const {
 #if FREEINK_DEVICE_WAVESHARE_EPAPER_397
   Waveshare397Power::waitForPowerButtonRelease();
 #endif
-#if defined(ENABLE_SERIAL_LOG) && !FREEINK_DEVICE_METALIO_EINK4 && !FREEINK_DEVICE_READPICO
+#if defined(ENABLE_SERIAL_LOG) && !FREEINK_DEVICE_METALIO_EINK4 && !FREEINK_DEVICE_READPICO && !FREEINK_DEVICE_PAPERS3
   // Tear down HWCDC so the host sees a clean disconnect and the peripheral
   // doesn't hold power domains that interfere with USB-powered GPIO wake.
   // logSerial is the raw HWCDC reference; Serial is the MySerialImpl proxy
   // (which doesn't expose end()).
   //
-  // Metalio and Read Pico are excluded because neither has a USB-powered GPIO
-  // wake to protect: their "off" is a board-owned shutdown (M5PM1 / the CW32L010
-  // PMU) that drops the rail, and tearing HWCDC down first would swallow the very
+  // Metalio, Read Pico and PaperS3 are excluded because none has a USB-powered GPIO
+  // wake to protect: their "off" is a board-owned shutdown (M5PM1 / CW32L010 /
+  // PMS150G) that drops the rail, and tearing HWCDC down first would swallow the very
   // handoff diagnostics those boards need when the shutdown fails.
   logSerial.end();
 #endif

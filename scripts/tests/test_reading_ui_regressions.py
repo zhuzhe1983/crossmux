@@ -26,7 +26,19 @@ def run_cpp(program, include_dirs=(), defines=()):
     with tempfile.TemporaryDirectory(prefix='reading-ui-') as directory:
         cpp = Path(directory) / 'check.cpp'
         exe = Path(directory) / 'check'
-        cpp.write_text(f'#include "{ROOT}/src/components/UiHighDpiProfile.h"\n' + program)
+        cpp.write_text(f'#include "{ROOT}/src/components/UiHighDpiProfile.h"\n' + r"""
+// Notification presentation is outside these geometry/reader ownership cases.
+namespace systemMessages {
+  template<class... T> void drawBadge(T&&...) {}
+  inline void clearHit() {}
+  inline unsigned revision() { return 0; }
+  inline bool hit(int, int) { return false; }
+}
+#ifdef __clang__
+// Imported SDK C typedef carries C++ field defaults; layout is tested separately.
+#pragma clang diagnostic ignored "-Wnon-c-typedef-for-linkage"
+#endif
+""" + program)
         subprocess.run(['c++', '-std=c++20', '-Wall', '-Wextra', '-Werror',
                         *('-I'+str(path) for path in include_dirs), *('-D'+define for define in defines), str(cpp), '-o', str(exe)], check=True)
         subprocess.run([str(exe)], check=True)
@@ -114,7 +126,8 @@ template<class... Args> void logDebug(Args&&...) {}
 #define LOG_DBG(...) logDebug(__VA_ARGS__)
 unsigned long millis() { static unsigned long value=0;return ++value; }
 struct CrossPointSettings { enum { INX,CLASSIC,LYRA };int uiTheme=INX; } SETTINGS;
-struct MappedInputManager {
+class MappedInputManager {
+ public:
  enum class Button { Back,Confirm,NavNext,NavPrevious,Count };
  enum class SwipeDir { None,Up,Down,Left,Right };
  bool touch=true; Button pressed=Button::Count,held=Button::Count,extraHeld=Button::Count,released=Button::Count;
@@ -208,6 +221,8 @@ struct UiListActivity : Activity {
  }
  void navigateButtons() {++navigations;}
  void drawChrome() {}void drawFooter() {}
+ virtual void beginDisplayFrame() {}
+ virtual void displayFrame() {renderer.displayBuffer();}
  void scanUi() {scanSelections.push_back(showMainTabContentSelection());}
  void renderUi() {paintSelections.push_back(showMainTabContentSelection());}
  void syncListViewport(UiScreen&,fui::ListProps&,int=0);
@@ -524,6 +539,8 @@ int main() {
         files = (ROOT / 'src/activities/home/FileBrowserActivity.cpp').read_text()
         settings = (ROOT / 'src/activities/settings/SettingsActivity.cpp').read_text()
         apps = (ROOT / 'src/activities/apps/AppsMenuActivity.cpp').read_text()
+        apps_header = (ROOT / 'src/activities/apps/AppsMenuActivity.h').read_text()
+        app_count = method(apps_header, 'int getVisibleAppCount() const')
         stats = (ROOT / 'src/activities/apps/reading-stats/ReadingStatsActivity.cpp').read_text()
         # Run the production layout preambles; unrelated data/row rendering stays
         # covered by the existing style and FreeInkUI list checks.
@@ -540,6 +557,7 @@ int main() {
 #include "components/themes/inx/InxTheme.h"
 #include "InxItemLayout.h"
 #define tr(key) #key
+namespace BoardConfig { bool isPaperMono() { return false; } }
 class GfxRenderer {
  public:
   int width=684,height=1216;
@@ -558,16 +576,20 @@ struct UITheme {
 };
 namespace fui {
 struct Insets { int top,right,bottom,left; };
-struct ListProps { const int* items=nullptr; unsigned count=0; int action=0,inputMask=0; };
+struct ListProps {
+ const int* items=nullptr; unsigned count=0; int action=0,inputMask=0;
+ void (*iconPainter)()=nullptr;void* iconPainterCtx=nullptr;
+};
 constexpr int InputTouch=1;
 }
 struct UiScreen {
   int top=-1;
+  unsigned listCount=0;
   bool absolute=false;
   void setContentMarginFromScreen(fui::Insets margin) { top=margin.top; absolute=true; }
   void setContentMargin(fui::Insets margin) { top=margin.top; absolute=false; }
   void spacer(int gap) { top+=gap; }
-  void list(fui::ListProps) {}
+  void list(fui::ListProps props) { listCount=props.count; }
 };
 struct Page {
   GfxRenderer renderer;
@@ -590,16 +612,20 @@ struct ReadingStatsActivity : Page {
 };
 struct AppsMenuActivity : Page {
   struct { int selected=0; } nav;
-  int count=12;
-  bool icons=true;
-  std::vector<int> rowItems;
+  unsigned paintedIconCount=0;
+  static void paintListIcon() {}
+  size_t installedCount=11;
+  int gridCount=0;
+  bool iconLayout=true;
+  struct { void resetPlacements() {} } icons;
+  std::vector<int> rowItems=std::vector<int>(12);
   Rect recorded{};
   static constexpr int ACTION_ROW=1;
-  int getVisibleAppCount() const { return count; }
-  bool usesIconLayout() const { return icons; }
+  // PRODUCTION_APP_COUNT
+  bool usesIconLayout() const { return iconLayout; }
   bool showMainTabContentSelection() const { return false; }
-  void drawIconGrid(UiScreen&,Rect rect,int,bool) { recorded=rect; }
-  void syncPagedViewport(int) {}
+  void drawIconGrid(UiScreen&,Rect rect,int count,bool) { recorded=rect; gridCount=count; }
+  void syncPagedViewport(int, bool = false) {}
   void syncListViewport(UiScreen&,fui::ListProps&) {}
   Rect appContentRect() const;
   void buildScreen(UiScreen&);
@@ -630,20 +656,26 @@ int main() {
       const Rect grid=apps.recorded;
       for (int slot=0;slot<InxGridGeometry::itemsPerPage;++slot) {
         const Rect cell=InxGridGeometry::cellBounds(slot,grid.width,grid.height);
-        assert(InxGridGeometry::indexFromPoint(cell.x,cell.y,grid.width,grid.height,0,apps.count)==slot);
-        assert(InxGridGeometry::indexFromPoint(cell.x-1,cell.y,grid.width,grid.height,0,apps.count)==-1);
+        assert(InxGridGeometry::indexFromPoint(cell.x,cell.y,grid.width,grid.height,0,apps.getVisibleAppCount())==slot);
+        assert(InxGridGeometry::indexFromPoint(cell.x-1,cell.y,grid.width,grid.height,0,apps.getVisibleAppCount())==-1);
       }
-      assert(InxGridGeometry::indexFromPoint(0,-1,grid.width,grid.height,0,apps.count)==-1);
-      assert(InxGridGeometry::indexFromPoint(0,grid.height,grid.width,grid.height,0,apps.count)==-1);
-      apps.icons=false; apps.buildScreen(screen);
+      assert(InxGridGeometry::indexFromPoint(0,-1,grid.width,grid.height,0,apps.getVisibleAppCount())==-1);
+      assert(InxGridGeometry::indexFromPoint(0,grid.height,grid.width,grid.height,0,apps.getVisibleAppCount())==-1);
+      apps.iconLayout=false; apps.buildScreen(screen);
       assert(screen.top==bottom+theme.metrics.verticalSpacing && screen.absolute);
-      apps.count=0; apps.buildScreen(screen);
-      assert(theme.empty.y==grid.y && theme.empty.height==grid.height);
+      // A card with no installed packages still has the separate store entry.
+      apps.installedCount=0; apps.rowItems.resize(1);
+      assert(apps.getVisibleAppCount()==1);
+      apps.iconLayout=true; apps.buildScreen(screen);
+      assert(apps.gridCount==1 && apps.recorded.y==grid.y && apps.recorded.height==grid.height);
+      apps.iconLayout=false; apps.buildScreen(screen);
+      assert(screen.listCount==1 && screen.top==grid.y && screen.absolute);
     }
   }
 }
 '''
-        run_cpp(program, include_dirs=(ROOT / 'src', ROOT / 'lib/hal'))
+        run_cpp(program.replace('// PRODUCTION_APP_COUNT', app_count),
+                include_dirs=(ROOT / 'src', ROOT / 'lib/hal'))
 
     def test_all_main_tabs_share_drawing_and_input_geometry(self):
         activity = (ROOT / 'src/activities/Activity.cpp').read_text()
@@ -694,7 +726,8 @@ struct Activity {
   void selectMainTabContentEdge(MainTabContentEdge) { chosen=true;++edgeSelections; }
   void drawPageHeader(const Rect&,const char*,const char* =nullptr) const;
 };
-struct MappedInputManager {
+class MappedInputManager {
+ public:
   enum class Button { None,Left,Right,Up,Down,Confirm,Back };
   bool tapped=true,down=false,touchReleased=false;
   bool wasScreenTouchReleased() const { return touchReleased; }
@@ -706,7 +739,7 @@ struct MappedInputManager {
   bool wasPressed(Button b) { return pressed==b; }
   bool isPressed(Button b) { return held==b; }
 };
-struct { bool standbyShortcutEnabled=false; } SETTINGS;
+[[maybe_unused]] struct { bool standbyShortcutEnabled=false; } SETTINGS;
 struct ActivityManager {
   Activity* currentActivity=nullptr;
   GfxRenderer renderer;
@@ -821,15 +854,18 @@ int main() {
 #define LOG_DBG(...) ((void)0)
 enum { eIncrement };
 void xTaskNotify(int,int,int) {}
+unsigned long millis() { return 0; }
 namespace haptic_feedback { inline void touchAction(bool=false) {} }
 struct { void clearTouchTapEvent() {} } gpio;
 struct RenderLock {
+  RenderLock() {}
   static inline bool busy=false;
   static bool peek() { return busy; }
   void unlock() {}
 };
 struct ActivityResult {};
-struct MappedInputManager {
+class MappedInputManager {
+ public:
   enum class Button { None,Back,Confirm,Left,Right,Up,Down };
   bool pressed=false,released=false,held=false,suppressed=false;
   bool tap=false,down=false,home=false,light=false;
@@ -876,6 +912,7 @@ std::unique_ptr<Activity> page(const char* theme) {
   p->name=p->tabs?"InxRecent":"Home";
   return p;
 }
+struct SystemMessagesActivity : Activity { SystemMessagesActivity(int,MappedInputManager&) {} };
 struct FrontlightPanelActivity : Activity {
   FrontlightPanelActivity(int,MappedInputManager&) { home=false;name="FrontlightPanel"; }
 };

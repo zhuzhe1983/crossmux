@@ -239,6 +239,20 @@ void SdCardFontSystem::ensureLoaded(GfxRenderer& renderer, bool allowFlashCache)
 
 void SdCardFontSystem::releaseLoadedFont(GfxRenderer& renderer) { manager_.unloadAll(renderer); }
 
+void SdCardFontSystem::releaseForStorageHandoff(GfxRenderer& renderer) {
+#if CROSSPOINT_VECTOR_FONTS
+  unloadTtf(renderer);  // Includes streamed file handles and UI vector faces.
+#endif
+  manager_.unloadAll(renderer);
+  // Reuse the boot-time built-in mappings. A vector unload may have cleared
+  // them; rebuilding at most seven small map entries happens once, after the
+  // much larger SD faces have been freed, never during USB rendering.
+  for (const auto& ui : kUiFontSizes) renderer.setFallbackFont(ui.fontId, ui.builtinFallbackId);
+  const int titleFallback = kUiFontSizes[2].builtinFallbackId;
+  renderer.setFallbackFont(CONTROL_18_FONT_ID, titleFallback);
+  renderer.setFallbackFont(NOTOSANS_18_FONT_ID, titleFallback);
+}
+
 bool SdCardFontSystem::adoptCompleteChineseNotoSans() {
 #ifdef ENABLE_CHINESE_VERSION
   if (SETTINGS.contentProfile != CrossPointSettings::ContentProfile::China || SETTINGS.sdFontFamilyName[0] != '\0' ||

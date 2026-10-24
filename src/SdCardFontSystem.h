@@ -52,6 +52,9 @@ class SdCardFontSystem {
 
   /// Release the resident SD font without changing the saved selection.
   void releaseLoadedFont(GfxRenderer& renderer);
+  /// Close every SD-backed font before raw USB access. Caller holds RenderLock;
+  /// the USB activity restarts afterwards, so no live font restoration is needed.
+  void releaseForStorageHandoff(GfxRenderer& renderer);
 
   /// Resolve an SD card font ID from family name + reader point size.
   /// Returns 0 if not found. Used by CrossPointSettings::getReaderFontId().

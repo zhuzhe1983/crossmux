@@ -73,8 +73,11 @@ class UiAppHost {
   freeink::ui::GfxRendererTarget uiTarget;  // must precede `app`: the app holds a reference to it
   UiApp app;
 
- private:
+ protected:
+  // Rebind fonts before loop-side layout measurements; caller holds RenderLock.
   void prepareUi();
+
+ private:
   // Opened by the render task after publication and closed on lifecycle/state
   // resets; read by the loop task (route*).
   std::atomic<bool> uiReady{false};

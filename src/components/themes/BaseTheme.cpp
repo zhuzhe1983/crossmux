@@ -27,6 +27,7 @@
 #include "components/icons/customListIcons.h"
 #include "components/icons/headerIcons.h"
 #include "components/icons/listIcons.h"
+#include "system/SystemMessages.h"
 #ifdef CROSSMUX_UI_PROFILE_HIGH_DPI
 #include "components/icons/uiChromeIcons.h"
 #endif
@@ -684,6 +685,8 @@ void BaseTheme::drawHeaderWithStyle(const GfxRenderer& renderer, Rect rect, cons
     props.styles.normal.borderWidth = tokens.headerUnderline;
   }
   fui::header(ui.frame, band, props);
+  // CrossStore and protocol services share the system inbox.
+  systemMessages::drawBadge(renderer, rect);
 }
 
 void BaseTheme::drawMainTabBar(const GfxRenderer&, Rect, MainTab) const {}
@@ -1234,7 +1237,13 @@ void BaseTheme::drawStatusBar(GfxRenderer& renderer, const float bookProgress, c
       availableTitleSpace = rendererableScreenWidth - titleMarginLeft - titleMarginRight;
       titleMarginLeftAdjusted = titleMarginLeft;
     }
-    if (UiHighDpiProfile::enabled && availableTitleSpace <= 0) return;
+    if (UiHighDpiProfile::enabled && availableTitleSpace <= 0) {
+      // CrossStore and protocol services share the system inbox.
+      systemMessages::drawBadge(renderer,
+                                Rect{orientedMarginLeft, screenHeight - orientedMarginBottom - paddingBottom - 50,
+                                     renderer.getScreenWidth() - orientedMarginLeft - orientedMarginRight, 44});
+      return;
+    }
     if (titleWidth > availableTitleSpace) {
       title = renderer.truncatedText(textFontId, title.c_str(), availableTitleSpace);
       titleWidth = renderer.getTextWidth(textFontId, title.c_str());
@@ -1245,6 +1254,11 @@ void BaseTheme::drawStatusBar(GfxRenderer& renderer, const float bookProgress, c
                           (availableTitleSpace - titleWidth) / 2,
                       textY, title.c_str());
   }
+  // CrossStore and protocol services share the system inbox.
+  const int badgeHeight = 44;
+  systemMessages::drawBadge(
+      renderer, Rect{orientedMarginLeft, screenHeight - orientedMarginBottom - paddingBottom - badgeHeight - 6,
+                     renderer.getScreenWidth() - orientedMarginLeft - orientedMarginRight, badgeHeight});
 }
 
 void BaseTheme::drawHelpText(const GfxRenderer& renderer, Rect rect, const char* label) {

@@ -2,7 +2,8 @@
 
 > Sticky, X4 Pro, X4 Classic, PaperMono, [eego A4](eego-a4.md), [Murphy M4](murphy-m4.md),
 > [Waveshare ePaper 3.97](waveshare-epaper-397.md), [Metalio E-Ink 4](metalio-eink4.md),
-> [MindReset Read Pico](read-pico.md), and [LilyGo T5 S3](lilygo-t5s3.md) are separate ESP32-S3
+> [MindReset Read Pico](read-pico.md), [LilyGo T5 S3](lilygo-t5s3.md), and
+> [M5Stack PaperS3](papers3.md) are separate ESP32-S3
 > compile-time targets. The one-binary rule in this document applies only to
 > the ESP32-C3 X3/X4 pair.
 
@@ -31,6 +32,7 @@ image:
 pio run -e x4pro
 pio run -e x4c
 pio run -e papermono
+pio run -e papers3
 pio run -e sticky
 pio run -e eego_a4
 pio run -e murphy_m4
@@ -43,12 +45,51 @@ pio run -e lilygo_t5s3
 Eight S3 targets are published by the shared Nightly matrix, including MindReset
 Read Pico (`readpico_nightly`). X4 Classic has the
 same `x4c_nightly` build and Hardware CI coverage, but remains build-only.
-LilyGo T5 S3 adds `lilygo_t5s3` for local development. Neither target joins the
+LilyGo T5 S3 adds `lilygo_t5s3` and PaperS3 adds `papers3` for local development.
+These development-only targets do not join the
 public Nightly or OTA indexes. Each published target builds
 one unified image, which is published under both legacy flavor pointers.
 Manual flashing must use the matching build; the embedded
 board tag rejects a tagged image for a different board. See
 [firmware-release.md](firmware-release.md) for publishing and rollback details.
+
+## PaperMono audio capability labels
+
+PaperMono's [official specification](https://docs.m5stack.com/en/core/PaperMono)
+lists a GPIO42 PWM buzzer and a PDM microphone on GPIO45/46. The
+[official buzzer example](https://docs.m5stack.com/en/arduino/papermono/buzzer)
+uses `M5.Speaker.tone()`; that API name does not imply an I2S codec is present.
+The SDK profile exposes the buzzer separately from codec audio. Its S3 Buzzer
+driver now supports short 24 kHz signed PCM using one-pin I2S pulse-density
+output, following the same principle as M5Unified's buzzer output. CrossStore
+reports this as PCM output in addition to the alert-tone capability. No codec
+or microphone capture support is implied. CrossStore labels `buzzer` as alert tones and `audio` as PCM output,
+not as a general test of whether the device can make sound. The microphone
+hardware row reads the board profile through HAL without starting capture or
+powering its rail; it explicitly says Lua app recording is not yet available.
+It does not add a microphone permission or an executable capture API.
+
+`scripts/generate_woodfish_audio.py` generates the original 140 ms damped
+wooden-percussion cue in `assets/audio/woodfish.wav` and the identical Flash PCM
+table, automatically before builds. No source recording was time-stretched or
+resampled. The cue uses 6720 Flash bytes; the SDK lazily allocates 768 bytes of
+internal DMA data plus driver descriptors/control state and reuses that channel
+until app exit/sleep. Conversion uses 256 bytes of stack scratch, with no audio
+task or whole-clip heap buffer. PCM is capped at 200 ms and writes have a 400 ms
+overall deadline (40 ms per write). GPIO duty is ramped at each end; the complete
+clip is drained before shutdown. Other targets retain tone output or a no-buzzer
+stub. `app.sound` remains a fixed-cue API, not a general MP3/WAV file player.
+
+Host checks compile the real SDK driver with recording I2S/LEDC stubs for S3,
+tone-only and no-buzzer builds: `python3 test/buzzer_pcm/test_buzzer.py`. They
+cover sample density/order, clip/tail completion, channel reuse, allocation/init/
+write failures, bounded timeout and clock rollover. Physical timbre/listening,
+repeat taps, exit and sleep acceptance for this PCM revision are still pending.
+
+Updating firmware does not update installed CrossStore packages. The original
+0.1.0 calculator, 2048 and woodfish packages contain no icon assets; the launcher
+shows its generic grid glyph for them. Version 0.2.0 includes the 2/4/16-gray
+assets and richer UI. Existing Lua 2048 and woodfish data formats remain readable.
 
 ## Standby-display light sleep
 
@@ -90,7 +131,7 @@ use the SDK BLE stub.
 X3/X4 profiles share `c3_hardware`: internal RAM, a Flash controller and paged
 coverage indexes for large SD fonts. The HAL protects the entire C3 BLE host
 lifetime from manual 10 MHz idle downclocking. Sticky, X4 Pro, X4 Classic, Paper
-Mono, Murphy M4, Waveshare 3.97, Metalio E-Ink 4, Read Pico and LilyGo T5 S3
+Mono, PaperS3, Murphy M4, Waveshare 3.97, Metalio E-Ink 4, Read Pico and LilyGo T5 S3
 inherit `s3_ble_psram` through their hardware profiles, including release/RC
 flavors where present. Sticky and Read Pico keep their tuned controller-only
 cores. EEGO A4 uses the prebuilt TinyUSB graph with BLE stubs; other USB-capable

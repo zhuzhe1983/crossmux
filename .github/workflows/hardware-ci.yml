@@ -154,6 +154,7 @@ jobs:
             -e x4pro_nightly \
             -e x4c_nightly \
             -e papermono_nightly \
+            -e papers3 \
             -e eego_a4_nightly \
             -e murphy_m4_nightly \
             -e waveshare_epaper_397_nightly \
@@ -162,6 +163,11 @@ jobs:
 
       - name: Check ReadPico display and input
         run: xvfb-run -a bash .pio/libdeps/simulator_readpico/simulator/tests/run_readpico_self_test.sh "$PWD"
+
+      - name: Check PaperS3 shutdown and firmware identity
+        run: |
+          python3 test/test_papers3_port.py
+          python3 test/test_hal_power_sources.py
 
       - name: Record firmware stats
         run: |

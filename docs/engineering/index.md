@@ -27,6 +27,7 @@ that matches your task — don't load everything at once.
 | [sticky-aa-test.md](sticky-aa-test.md) | Historical Sticky test2 firmware and its physical observations. |
 | [eego-a4.md](eego-a4.md) | Building, first-flashing, recovering, or hardware-validating the experimental ESP32-S3 eego A4 target. |
 | [lilygo-t5s3.md](lilygo-t5s3.md) | Building and physically validating the build-only LilyGo T5 S3 4.7 PRO/Lite target, SDK BoardT5S3, memory and sleep. |
+| [papers3.md](papers3.md) | Building and validating the experimental M5Stack PaperS3 target, touch-only input, PMS150G shutdown and recovery. |
 | [murphy-m4.md](murphy-m4.md) | Building, first-flashing, recovering, or hardware-validating the experimental ESP32-S3 Murphy M4 target. |
 | [waveshare-epaper-397.md](waveshare-epaper-397.md) | Building, flashing, or hardware-validating the experimental Waveshare ESP32-S3 ePaper 3.97 target. |
 | [sdk-upstream-sync.md](sdk-upstream-sync.md) | Reviewing the September 2026 SDK integration, upstream touch-menu behavior, source snapshots, and hardware acceptance limits. |

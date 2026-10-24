@@ -1,3 +1,31 @@
+# CrossStore 分支说明
+
+本分支的 AppsMenuActivity 从 TF 卡 `/.crosspoint/apps/` 读取安装包，显示已安装应用和独立商店入口。网格/列表跟随设置。传统原生应用说明保留在下方，不能用它描述当前商店启动器的注册方式。
+
+Lua 宿主在 `appstore/`，包校验与权限在 `src/crossstore/`；应用源码和语义图标由相邻 CrossStore 项目管理。游戏画布的规则在 Lua 中，通信协议、后台收听、核心阅读/传输服务仍在固件中。当前已迁移与未迁移功能详见 CrossStore README，API 说明见其 `docs/lua-api.md`。
+
+当前运行时 API 为 5：增加只读的阅读日期/成就查询与微信读书本地章节目录。商店直接进入图标网格，顶部有「全部」「已安装」与设置。勾表示已安装，上箭头表示目录版本较新；按数字组件比较版本，同版/本机较新版不会标成升级。图标保持原灰阶，键盘选择使用描边。
+
+安装与更新的入口是详情页底部固定主按钮。点击后先进入下载确认页，显示应用版本、准确字节数及申请权限；确认前不下载、不授权。卸载也进入独立确认页，提供「删除应用（保留数据）」「删除所有」「取消」，实体键默认选中取消。删除所有仅清理该应用的私有存档/配置、权限及对应聊天身份/记录；保留书籍、导出文件和共享阅读数据。停止聊天服务或清理失败会保留当前应用包供重试；多文件删除不能回滚已经清除的部分数据。
+
+图标角标位于图标内部右下角，白底黑边覆盖图像，灰阶通道也保留它；名称不再为角标腾位置。设置按钮使用可重建的正向 24/32px 设置图标。
+
+商店先从 `/.crosspoint/store-cache/` 读取匹配当前源地址的完整 JSON 快照，再在独立任务中更新；联网失败保留旧内容。首次无缓存时提示联网，已安装页仍可用。已有连接直接复用；Wi-Fi 关闭时尝试上次保存的网络，失败后可在设置中手动刷新/选网，不自动弹走缓存页面。退出商店/睡眠会取消任务；普通页面切换不停止刷新。任务仅随商店活动存在，没有后台 Lua 或常驻商店服务。
+
+静态目录每个 JSON 最多 16 项，完整缓存最多 64 页；UI 按屏幕尺寸每页最多显示 16 格，可跨 JSON 边界翻页。只有当前显示页、最多 64 个已安装条目的简短信息与可见图标驻留 RAM。新目录完整校验后切换两代缓存，失败不会替换旧代；图标用同 hash 的前代缓存过渡。图标预览是独立的固定 7048 字节 CSI1 文件，只有校验后的文件进入缓存；旧目录无预览时仍可安装，已安装包继续提供自己的图标。
+
+较新 API 的有效条目会在详情显示升级固件的原因，不能安装；已安装的兼容旧版仍可打开。目录和启动器只统计合法 `<id>.csp`，忽略 macOS 的 `._` 元数据。刷新不会改变正在进行的点击/按键手势，空闲帧才按应用 ID 保留选中项和页位置。
+
+权限按应用声明并逐项授权；系统能力只读。Mono 木鱼通过 HalBuzzer 播放短音，无蜂鸣器设备继续计数；不强制系统每次操作发声。聊天在清醒时可由原生服务后台收听，休眠停止；后台通知会回到对应 Lua 应用和会话。Lua VM 不常驻后台。
+
+验证：`python3 test/crossstore/test_runtime.py ../CrossStore/packages` 使用实际 Lua VM 检查沙箱、配额、游戏持久化、四种画布尺寸与完整聊天快照。构建 `papermono_store` / `papers3_store` 后仍需分别实测触摸、声音、网络和休眠；宿主测试不代表硬件验收。
+
+`test/crossstore/test_catalog.py` 验证目录/安装元信息的不同兼容性策略及分页。相邻 CrossStore 检出存在时，CMake 还注册 `CrossStoreGames`、`CrossStoreReadingStats`、`CrossStoreWeReadCache`；非默认位置可通过 `-DCROSSSTORE_PACKAGES_DIR=/path/to/packages` 指定。新包更新与固件更新是两个独立步骤。
+
+网格/输入测试为 `test/crossstore/test_store_grid.py`，真实图标加载/灰阶通路测试为 `test/crossstore/test_package_icons.py`，目录/网络故障注入测试为 `test/store_catalog/test_store_catalog.py`。刷新任务使用 8 KiB 栈、一次复用的有界 scratch 和一页 JSON；S3 的目录 JSON 与最多 5248 字节图标任务表使用 PSRAM。下载与 JSON 解析错开，单次 HTTP 返回即释放 TLS；4 灰阶图标最多 16 KiB，16 灰阶最多 72 KiB 且必须位于 PSRAM，没有第二份全屏缓存。网络读/连接超时配置为 3 秒，单文件截止检查 12 秒；SDK DNS 解析不能立即取消，退出等待不承诺严格的 3 秒上限。实机需验证断网开店、两页切换、安装/卸载/升级角标、按住图标时目录更新，以及刷新期间返回/Home/休眠。
+
+---
+
 # Apps
 
 The `apps/` directory holds all non-reader sub-applications shipped on CrossMux. They use the Apps launcher (`AppsMenuActivity`) and the conventions below; the main-tab and home navigation expose that launcher.
@@ -107,6 +135,12 @@ IDs 17 through 31 remain available.
 
 - **i18n**: add `STR_MYAPP_TITLE: "My App"` to `lib/I18n/translations/english.yaml`. Other languages fall back to English; translate selectively. Then run `python scripts/gen_i18n.py lib/I18n/translations lib/I18n/` once locally (regenerated at build time too).
 - **Icon**: add `MyApp` to the `UIIcon` enum in `src/components/themes/BaseTheme.h` and add both 32×32 1-bit variants: the pre-rotated Lyra bitmap selected by `LyraTheme::iconForName(size==32)`, and the canonical-orientation bitmap selected by `InxAppIcons::get()`. No 24px bitmap is needed.
+
+The replacement [semantic app icon pack](../../../assets/app-icons/semantic-v1/README.md)
+contains 18 color masters plus 2/4/16-level PNG, packed binary and C++ variants at
+32/48/64/96/128px. `scripts/prepare_app_icons.py` regenerates these assets and
+`scripts/verify_app_icons.py` checks their on-disk consistency. These files are
+prepared resources; the current theme renderers still use the icons described above.
 
 ---
 
@@ -237,3 +271,16 @@ Apps share the reader's resource budget: about 380KB usable RAM on ESP32-C3, wit
 See [AGENTS.md](../../../AGENTS.md) and the
 [resource protocol](../../../docs/engineering/hardware-constraints.md#the-resource-protocol);
 apps are not exempt.
+
+## Experimental native chat
+
+Opt-in `papermono_chat` builds provide `rf_chat` and `wifi_chat`; `papers3_chat`
+provides Wi-Fi chat. Apps combine hardware requirements with user visibility,
+so a device cannot enable a missing radio through the visibility setting.
+See [chat apps](../../../docs/engineering/chat-apps.md) for protocol, resource,
+storage and acceptance details.
+
+The experimental chat builds also provide optional **Listen in background**
+under each app’s **Discover & settings**. Awake listeners post coalesced system
+messages while reading; the badge opens the corresponding conversation. Sleep
+and USB Drive stop listeners. See [chat lifecycle and limits](../../../docs/engineering/chat-apps.md).

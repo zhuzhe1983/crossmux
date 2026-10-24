@@ -8,6 +8,7 @@
 
 #include "BleInput.h"
 #include "MappedInputManager.h"
+#include "SdCardFontSystem.h"
 #include "SilentRestart.h"
 #include "components/UITheme.h"
 
@@ -16,6 +17,11 @@ namespace fui = freeink::ui;
 void UsbDriveActivity::onEnter() {
   bleinput::stop();
   Activity::onEnter();
+  {
+    RenderLock lock(*this);
+    // No font lookup may touch the filesystem once the USB host owns the card.
+    sdFontSystem.releaseForStorageHandoff(renderer);
+  }
   resetUi();
   app.setScreen(&UsbDriveActivity::driveScreen, this);
 

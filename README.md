@@ -36,6 +36,8 @@
 
 This table describes configured release targets, not a claim that every feature has passed hardware acceptance. Each S3 target needs its own image. X4 Classic (`x4c`) and [LilyGo T5 S3 4.7 PRO/Lite](./docs/engineering/lilygo-t5s3.md) (`lilygo_t5s3`) have development build targets and are absent from public Nightly/OTA indexes. See [device variants](./docs/engineering/device-variants.md) for target-specific limitations.
 
+[M5Stack PaperS3](./docs/engineering/papers3.md) has an experimental development target (`pio run -e papers3`), separate from Paper Mono. Basic display, touch, EPUB reading and two sleep/recovery cycles passed on v1.0; extended acceptance remains pending. Native 16-level grayscale is not yet integrated. It is not published in Nightly/OTA indexes.
+
 Use [Stable](https://github.com/0x1abin/crossmux/releases/tag/stable) for the stable X3/X4 channel, or [Nightly](https://github.com/0x1abin/crossmux/releases/tag/nightly) for development builds. The [target table](./scripts/nightly_targets.py) defines channels and artifact names; [release architecture](./docs/engineering/firmware-release.md) explains packaging and OTA. Current source version and build environments live in [platformio.ini](./platformio.ini).
 
 ## Install firmware

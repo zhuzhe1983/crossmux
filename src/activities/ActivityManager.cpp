@@ -6,22 +6,35 @@
 #include <HalDisplay.h>
 #include <HalGPIO.h>
 #include <HalPowerManager.h>
+#include <HalStorage.h>
 #include <Memory.h>
 #include <VectorFontSupport.h>
 
 #include <algorithm>
+#include <cstdio>
 
+#include "AppCapabilities.h"
+#include "ChatBuildConfig.h"
 #include "CrossPointSettings.h"
+#if CROSSMUX_CHAT
+#include "apps/chat/ChatActivity.h"
+#include "apps/chat/ChatService.h"
+#endif
 #include "HapticFeedback.h"
 #include "OpdsServerStore.h"
 #include "apps/2048/Game2048Activity.h"
 #include "apps/AppsMenuActivity.h"
 #include "apps/airpage/AirPageActivity.h"
+#include "apps/appstore/AppStoreActivity.h"
+#include "apps/appstore/LuaAppActivity.h"
 #include "apps/avatar/UglyAvatarActivity.h"
 #include "apps/buddy/BuddyActivity.h"
 #include "apps/calculator/CalculatorActivity.h"
 #include "apps/sokoban/SokobanGameActivity.h"
 #include "components/SubpageLayout.h"
+#include "crossstore/Package.h"
+#include "system/SystemMessages.h"
+#include "util/SystemMessagesActivity.h"
 #ifdef ENABLE_CHINESE_VERSION
 #include "apps/chinese-chess/ChineseChessMenuActivity.h"
 #endif
@@ -109,6 +122,8 @@ void ActivityManager::renderTaskLoop() {
         const auto delayMs = currentActivity->idleRenderDelayMs();
         idleGeneration = idleRenderGeneration.load(std::memory_order_relaxed);
         display.setInverted(SETTINGS.screenInverted != 0);
+        systemMessages::beginFrame(currentActivity->name != "Chat" && currentActivity->name != "SystemMessages" &&
+                                   currentActivity->name != "Sleep" && currentActivity->name != "Boot");
         currentActivity->render(std::move(lock));
         if (delayMs != 0) waitTicks = pdMS_TO_TICKS(delayMs);
       } else if (!idleRenderCancelled(idleGeneration)) {
@@ -147,6 +162,36 @@ void ActivityManager::loop() {
   }
 
   if (currentActivity && pendingAction.load() == PendingAction::None) {
+    if (currentActivity->name != "Boot" && currentActivity->name != "Sleep") {
+#if CROSSMUX_CHAT
+      chat::service::tick(currentActivity->isReaderActivity() || currentActivity->isHomeActivity() ||
+                          (currentActivity->usesMainTabBar() && currentActivity->mainTab() == MainTab::Recent) ||
+                          currentActivity->name == "AppsMenu");
+#endif
+      static uint32_t notificationRevision = 0;
+      static uint32_t notificationRefreshAt = 0;
+      const uint32_t revision = systemMessages::revision();
+      if (revision != notificationRevision && millis() - notificationRefreshAt >= 5000) {
+        notificationRevision = revision;
+        notificationRefreshAt = millis();
+        requestUpdate();
+      }
+      int x = 0, y = 0;
+      bool openMessages = false;
+      if (mappedInput.wasScreenTapped(x, y)) {
+        RenderLock lock;
+        openMessages = systemMessages::hit(x, y);
+        if (openMessages) systemMessages::clearHit();
+      }
+      if (openMessages) {
+        auto messages = makeUniqueNoThrow<SystemMessagesActivity>(renderer, mappedInput);
+        if (messages)
+          pushActivity(std::move(messages));
+        else
+          LOG_ERR("ACT", "OOM: system messages activity");
+        return;
+      }
+    }
     if (handleMainTabInput()) {
       resetHomeStandbyInput();
       return;
@@ -263,6 +308,10 @@ void ActivityManager::loop() {
       }
       pendingAction.store(PendingAction::None);
       currentActivity = std::move(pendingActivity);
+      systemMessages::clearHit();
+#if CROSSMUX_CHAT
+      if (currentActivity->requiresExclusiveStorageLoop()) chat::service::stopForSleep();
+#endif
       resetHomeStandbyInput();
 
       // Drop any one-shot tap/release edge events the outgoing activity already
@@ -460,6 +509,7 @@ void ActivityManager::exitActivity(const RenderLock& lock) {
   // The outgoing screen's header back button must not eat taps on the next
   // screen; the next header draw re-records it.
   HeaderBackTapTarget::clear();
+  systemMessages::clearHit();
 }
 
 void ActivityManager::replaceActivity(std::unique_ptr<Activity>&& newActivity) {
@@ -503,7 +553,13 @@ void ActivityManager::goToUsbDrive() {
 
 void ActivityManager::goToSettings() { replaceActivityWith<SettingsActivity>(); }
 
-void ActivityManager::goToUglyAvatar() { replaceActivityWith<UglyAvatarActivity>(); }
+void ActivityManager::goToUglyAvatar() {
+#if CROSSMUX_STORE
+  replaceActivityWith<LuaAppActivity>("avatar");
+#else
+  replaceActivityWith<UglyAvatarActivity>();
+#endif
+}
 
 void ActivityManager::goToFileBrowser(std::string path) { replaceActivityWith<FileBrowserActivity>(std::move(path)); }
 
@@ -616,38 +672,162 @@ void ActivityManager::goToCrashReport() { replaceActivityWith<CrashActivity>(); 
 
 void ActivityManager::goToApps() { replaceActivityWith<AppsMenuActivity>(); }
 
+void ActivityManager::goToAppStore() { replaceActivityWith<AppStoreActivity>(); }
+
+void ActivityManager::goToRfChat() {
+#if CROSSMUX_LORA_CHAT
+  if (appCapabilities::allows(appCapabilities::Requirement::Radio))
+#if CROSSMUX_STORE
+    replaceActivityWith<LuaAppActivity>("rf_chat");
+#else
+    replaceActivityWith<ChatActivity>(chat::Kind::Radio);
+#endif
+#endif
+}
+void ActivityManager::goToWifiChat() {
+#if CROSSMUX_TOX_CHAT
+  if (appCapabilities::allows(appCapabilities::Requirement::WifiChat))
+#if CROSSMUX_STORE
+    replaceActivityWith<LuaAppActivity>("wifi_chat");
+#else
+    replaceActivityWith<ChatActivity>(chat::Kind::Wifi);
+#endif
+#endif
+}
+void ActivityManager::goToEspChat() {
+#if CROSSMUX_ESP_CHAT
+  if (appCapabilities::allows(appCapabilities::Requirement::EspNow))
+#if CROSSMUX_STORE
+    replaceActivityWith<LuaAppActivity>("esp_chat");
+#else
+    replaceActivityWith<ChatActivity>(chat::Kind::EspNow);
+#endif
+#endif
+}
+
 void ActivityManager::goToReadingStatsMenu() { replaceActivityWith<ReadingStatsMenuActivity>(); }
 
-void ActivityManager::goToReadingStats() { replaceActivityWith<ReadingStatsActivity>(true); }
+void ActivityManager::goToReadingStats() {
+#if CROSSMUX_STORE
+  replaceActivityWith<LuaAppActivity>("reading_stats");
+#else
+  replaceActivityWith<ReadingStatsActivity>(true);
+#endif
+}
 
-void ActivityManager::goToSudoku() { replaceActivityWith<SudokuMenuActivity>(); }
+void ActivityManager::goToSudoku() {
+#if CROSSMUX_STORE
+  replaceActivityWith<LuaAppActivity>("sudoku");
+#else
+  replaceActivityWith<SudokuMenuActivity>();
+#endif
+}
 
-void ActivityManager::goToSokoban() { replaceActivityWith<SokobanGameActivity>(); }
+void ActivityManager::goToSokoban() {
+#if CROSSMUX_STORE
+  replaceActivityWith<LuaAppActivity>("sokoban");
+#else
+  replaceActivityWith<SokobanGameActivity>();
+#endif
+}
 
-void ActivityManager::goToGomoku() { replaceActivityWith<GomokuMenuActivity>(); }
+void ActivityManager::goToGomoku() {
+#if CROSSMUX_STORE
+  replaceActivityWith<LuaAppActivity>("gomoku");
+#else
+  replaceActivityWith<GomokuMenuActivity>();
+#endif
+}
 
-void ActivityManager::goToMinesweeper() { replaceActivityWith<MinesweeperMenuActivity>(); }
+void ActivityManager::goToMinesweeper() {
+#if CROSSMUX_STORE
+  replaceActivityWith<LuaAppActivity>("minesweeper");
+#else
+  replaceActivityWith<MinesweeperMenuActivity>();
+#endif
+}
 
-void ActivityManager::goToPixelSwitch() { replaceActivityWith<PixelSwitchActivity>(); }
+void ActivityManager::goToPixelSwitch() {
+#if CROSSMUX_STORE
+  replaceActivityWith<LuaAppActivity>("pixel_switch");
+#else
+  replaceActivityWith<PixelSwitchActivity>();
+#endif
+}
 
-void ActivityManager::goToCalculator() { replaceActivityWith<CalculatorActivity>(); }
+void ActivityManager::goToCalculator() {
+#if CROSSMUX_STORE
+  replaceActivityWith<LuaAppActivity>("calculator");
+#else
+  replaceActivityWith<CalculatorActivity>();
+#endif
+}
 
-void ActivityManager::goToWoodfish() { replaceActivityWith<WoodfishActivity>(); }
+void ActivityManager::goToWoodfish() {
+#if CROSSMUX_STORE
+  replaceActivityWith<LuaAppActivity>("woodfish");
+#else
+  replaceActivityWith<WoodfishActivity>();
+#endif
+}
 
-void ActivityManager::goToGame2048() { replaceActivityWith<Game2048Activity>(); }
+void ActivityManager::goToGame2048() {
+#if CROSSMUX_STORE
+  replaceActivityWith<LuaAppActivity>("game2048");
+#else
+  replaceActivityWith<Game2048Activity>();
+#endif
+}
 
-void ActivityManager::goToAirPage() { replaceActivityWith<AirPageActivity>(); }
+void ActivityManager::goToAirPage() {
+#if CROSSMUX_STORE
+  replaceActivityWith<LuaAppActivity>("airpage");
+#else
+  replaceActivityWith<AirPageActivity>();
+#endif
+}
 
-void ActivityManager::goToBuddy() { replaceActivityWith<BuddyActivity>(); }
+void ActivityManager::goToBuddy() {
+#if CROSSMUX_STORE
+  replaceActivityWith<LuaAppActivity>("buddy");
+#else
+  replaceActivityWith<BuddyActivity>();
+#endif
+}
 
-void ActivityManager::goToStandby() { replaceActivityWith<StandbyActivity>(); }
+void ActivityManager::goToStandby() {
+#if CROSSMUX_STORE
+  // Home's shortcut also exists before the optional package is installed.
+  char path[sizeof(crossstore::INSTALL_DIR) + sizeof("/standby.csp")];
+  std::snprintf(path, sizeof(path), "%s/standby.csp", crossstore::INSTALL_DIR);
+  if (!Storage.exists(path)) {
+    goToApps();
+    return;
+  }
+  replaceActivityWith<LuaAppActivity>("standby");
+#else
+  replaceActivityWith<StandbyActivity>();
+#endif
+}
 
 #ifdef ENABLE_CHINESE_VERSION
-void ActivityManager::goToChineseChess() { replaceActivityWith<ChineseChessMenuActivity>(); }
+void ActivityManager::goToChineseChess() {
+#if CROSSMUX_STORE
+  replaceActivityWith<LuaAppActivity>("chinese_chess");
+#else
+  replaceActivityWith<ChineseChessMenuActivity>();
+#endif
+}
 #endif
 
 #ifdef ENABLE_CHINESE_VERSION
-void ActivityManager::goToWeRead() { replaceActivityWith<WeReadActivity>(); }
+void ActivityManager::goToWeRead() {
+#if CROSSMUX_STORE
+  replaceActivityWith<LuaAppActivity>("weread");
+#else
+  replaceActivityWith<WeReadActivity>();
+#endif
+}
 #endif
 
 void ActivityManager::pushActivity(std::unique_ptr<Activity>&& activity) {
@@ -717,6 +897,10 @@ void ActivityManager::prepareForSleep() {
   RenderLock lock;
   for (const auto& activity : stackActivities) activity->prepareForSleep();
   if (currentActivity) currentActivity->prepareForSleep();
+#if CROSSMUX_CHAT
+  chat::service::stopForSleep();
+#endif
+  systemMessages::beginFrame(false);
 }
 
 void ActivityManager::requestUpdate(bool immediate) {

@@ -21,8 +21,10 @@ def run(program, headers=None, sources=(), defines=()):
         cpp = directory / "check.cpp"
         cpp.write_text(program)
         binary = directory / "check"
+        compiler = subprocess.check_output(["c++", "--version"], text=True).lower()
+        warnings = [] if "clang" in compiler else ["-Wno-class-memaccess"]
         subprocess.run([
-            "c++", "-std=c++20", "-Wall", "-Wextra", "-Werror", "-fno-exceptions", "-Wno-class-memaccess",
+            "c++", "-std=c++20", "-Wall", "-Wextra", "-Werror", "-fno-exceptions", *warnings,
             "-I" + str(directory), "-I" + str(API), "-I" + str(SAX / "include"),
             *["-D" + value for value in defines], str(cpp), *map(str, sources), "-o", str(binary),
         ], check=True)
