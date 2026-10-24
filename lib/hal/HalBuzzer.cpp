@@ -107,7 +107,10 @@ void shutdown() {
 }
 }  // namespace HalBuzzer
 
+#if !(FREEINK_DEVICE_WAVESHARE_EPAPER_397 && CROSSPOINT_CAP_SOUND_FEEDBACK)
 namespace HalRadioAudio {
+OutputKind outputKind() { return supports() ? OutputKind::Buzzer : OutputKind::None; }
+
 bool supports() {
 #if FREEINK_CAP_BUZZER && !CROSSPOINT_EMULATED && FREEINK_DEVICE_PAPERMONO && defined(CONFIG_IDF_TARGET_ESP32S3)
   return Buzzer::supportsPcm();
@@ -162,3 +165,4 @@ void end() {
 #endif
 }
 }  // namespace HalRadioAudio
+#endif

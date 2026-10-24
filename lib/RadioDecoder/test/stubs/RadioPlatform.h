@@ -12,8 +12,8 @@
 #include <thread>
 #include <vector>
 
-inline bool failTask = false, failOutputTask = false, failWorkspace = false, failControl = false, audioSupported = true,
-            failBegin = false, failAudio = false, paceAudio = true;
+inline bool failTask = false, failOutputTask = false, failWorkspace = false, failControl = false, failBegin = false,
+            failAudio = false, paceAudio = true;
 inline size_t internalFree = 100000;
 inline std::atomic<unsigned> workspaces{0}, tasks{0}, audioOwners{0}, writes{0}, capsDeleted{0};
 inline std::atomic<unsigned> controls{0}, sessions{0};
@@ -111,7 +111,10 @@ class HalMemory {
   static HeapStats getPsramHeap() { return {1000000, 1000000, 1000000, 1000000}; }
 };
 namespace HalRadioAudio {
-inline bool supports() { return audioSupported; }
+enum class OutputKind { None, Buzzer, Speaker };
+inline OutputKind configuredOutput = OutputKind::Buzzer;
+inline OutputKind outputKind() { return configuredOutput; }
+inline bool supports() { return outputKind() != OutputKind::None; }
 inline bool begin(uint8_t volume) {
   if (volume != 50 || failBegin) return false;
   ++audioOwners;

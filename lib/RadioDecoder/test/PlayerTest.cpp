@@ -66,7 +66,7 @@ struct Reference {
     return true;
   }
 };
-std::vector<int16_t> reference(size_t byteCount) {
+std::vector<int16_t> reference(size_t byteCount, radio::SpeakerLoudness::Profile profile) {
   Reference reference;
   reference.decoder.reset();
   std::array<uint8_t, radio::Mp3Framer::BUFFER_BYTES> input{};
@@ -86,7 +86,7 @@ std::vector<int16_t> reference(size_t byteCount) {
         result.insert(result.end(), samples, samples + count);
         return true;
       },
-      &processed, radio::SpeakerLoudness::Profile::Buzzer);
+      &processed, profile);
   assert(!loudness.failed());
   assert(loudness.feed(reference.result.data(), reference.result.size()));
   assert(loudness.finish());
@@ -133,10 +133,10 @@ void checkGap(const std::vector<int16_t>& original) {
               expected.size(), inserted);
 }
 
-void bufferedTests(const char* longPath) {
+void bufferedTests(const char* longPath, radio::SpeakerLoudness::Profile profile) {
   std::ifstream file(longPath, std::ios::binary);
   mp3Bytes.assign(std::istreambuf_iterator<char>(file), {});
-  const auto original = reference(mp3Bytes.size());
+  const auto original = reference(mp3Bytes.size(), profile);
   assert(original.size() > 96000);
   paceAudio = true;
   for (const auto mode : {NetworkMode::Complete, NetworkMode::Jitter, NetworkMode::LongGap}) {
@@ -160,7 +160,7 @@ void bufferedTests(const char* longPath) {
   }
   for (const auto mode : {NetworkMode::FailAfter, NetworkMode::TimeoutAfter}) {
     networkMode = mode;
-    const auto partial = reference(16384);
+    const auto partial = reference(16384, profile);
     Player player;
     assert(player.start("https://radio.example/live"));
     waitFor(player, State::Error);
@@ -205,7 +205,7 @@ void bufferedTests(const char* longPath) {
   }
   // Less than the 512 ms startup watermark still plays on normal EOF.
   mp3Bytes.resize(384 * 5);  // Five complete 48 kHz/128 kbps MPEG-1 frames.
-  const auto shortTail = reference(mp3Bytes.size());
+  const auto shortTail = reference(mp3Bytes.size(), profile);
   assert(shortTail.size() < 12288 && !shortTail.empty());
   networkMode = NetworkMode::Complete;
   {
@@ -219,21 +219,22 @@ void bufferedTests(const char* longPath) {
   clean();
   paceAudio = false;
 }
-}  // namespace
-int main(int argc, char** argv) {
-  assert(argc == 3);
-  std::ifstream file(argv[1], std::ios::binary);
+void lifecycleTests(const char* shortPath, radio::SpeakerLoudness::Profile profile) {
+  paceAudio = true;
+  const auto initialDeleted = capsDeleted.load(), initialOutputDeleted = outputTasksDeleted.load();
+  std::ifstream file(shortPath, std::ios::binary);
   mp3Bytes.assign(std::istreambuf_iterator<char>(file), {});
   assert(!mp3Bytes.empty());
-  capturedPcm.reserve(400000);
-  pcmWrites.reserve(2000);
+  const auto original = reference(mp3Bytes.size(), profile);
   {
     Player player;
     assert(player.snapshot().state == State::Idle);
     assert(!player.start("file:///book/test.mp3") && player.snapshot().error == Error::InvalidUrl);
-    audioSupported = false;
+    const auto supportedOutput = HalRadioAudio::configuredOutput;
+    HalRadioAudio::configuredOutput = HalRadioAudio::OutputKind::None;
     assert(!player.start("https://radio.example/live") && player.snapshot().error == Error::Unsupported);
-    audioSupported = true;
+    assert(workspaces.load() == 0 && tasks.load() == 0 && audioOwners.load() == 0 && controls.load() == 0);
+    HalRadioAudio::configuredOutput = supportedOutput;
     internalFree = 1000;
     assert(!player.start("https://radio.example/live") && player.snapshot().error == Error::NoMemory);
     internalFree = 100000;
@@ -270,6 +271,7 @@ int main(int argc, char** argv) {
     assert(player.snapshot().frames > 10 && player.snapshot().error == Error::None);
     assert(requests.load() == (mode == NetworkMode::Redirect ? 2 : 1));
     player.stopAndJoin();
+    checkUnbroken(original);
     clean();
   }
   for (const auto mode : {NetworkMode::HoldBefore, NetworkMode::HoldAfter}) {
@@ -296,8 +298,25 @@ int main(int argc, char** argv) {
     player.stopAndJoin();
   }
   clean();
-  assert(capsDeleted.load() == 32 && outputTasksDeleted.load() == 15);
-  bufferedTests(argv[2]);
+  assert(capsDeleted.load() - initialDeleted == 32 && outputTasksDeleted.load() - initialOutputDeleted == 15);
+}
+}  // namespace
+int main(int argc, char** argv) {
+  assert(argc == 3);
+  capturedPcm.reserve(400000);
+  pcmWrites.reserve(2000);
+  struct ProfileCase {
+    HalRadioAudio::OutputKind output;
+    radio::SpeakerLoudness::Profile profile;
+  };
+  for (const auto test : {ProfileCase{HalRadioAudio::OutputKind::Buzzer, radio::SpeakerLoudness::Profile::Buzzer},
+                          ProfileCase{HalRadioAudio::OutputKind::Speaker, radio::SpeakerLoudness::Profile::Standard}}) {
+    HalRadioAudio::configuredOutput = test.output;
+    lifecycleTests(argv[1], test.profile);
+    bufferedTests(argv[2], test.profile);
+    std::printf("Output profile %u: exact reference samples and lifecycle passed\n",
+                static_cast<unsigned>(test.output));
+  }
   std::puts(
       "Player lifecycle: allocation/audio failures, redirects, timeout, jitter/underrun recovery, finite tails and "
       "cancel/join passed");

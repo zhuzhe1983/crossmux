@@ -4,7 +4,8 @@
 #include <cstdint>
 
 namespace HalRadioAudio {
-// Currently the Mono single-pin output only; no fallback to another device.
+enum class OutputKind : uint8_t { None, Buzzer, Speaker };
+OutputKind outputKind();
 bool supports();
 
 // One worker owns begin/write/end. Fixed 24 kHz, signed 16-bit mono PCM.
@@ -18,6 +19,7 @@ bool write(const int16_t* samples, size_t count);
 // May be called by the foreground while the worker is playing.
 void setVolume(uint8_t volume);
 // Same worker as begin/write. <=40 ms fade/drain budget, then driver cleanup.
+// Codec control and driver teardown are not included in that DMA wait budget.
 // Short cues/shutdown never preempt a stream; its producer must release it.
 void end();
 }  // namespace HalRadioAudio

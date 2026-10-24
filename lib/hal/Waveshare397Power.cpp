@@ -6,9 +6,19 @@
 
 #include <Logging.h>
 #include <Wire.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/semphr.h>
 
 namespace Waveshare397Power {
 namespace {
+
+SemaphoreHandle_t busMutex() {
+  // One board-lifetime recursive mutex permits begin() and compound PMIC
+  // operations under a caller's bus guard without allocating from the heap.
+  static StaticSemaphore_t storage;
+  static SemaphoreHandle_t mutex = xSemaphoreCreateRecursiveMutexStatic(&storage);
+  return mutex;
+}
 
 constexpr uint8_t I2C_ADDRESS = 0x34;
 constexpr int8_t IRQ_PIN = 38;
@@ -98,7 +108,17 @@ bool configure() {
 
 }  // namespace
 
+ScopedBusLock::ScopedBusLock() {
+  const auto mutex = busMutex();
+  configASSERT(mutex);
+  const auto result = xSemaphoreTakeRecursive(mutex, portMAX_DELAY);
+  configASSERT(result == pdTRUE);
+}
+
+ScopedBusLock::~ScopedBusLock() { xSemaphoreGiveRecursive(busMutex()); }
+
 bool begin() {
+  const ScopedBusLock lock;
   if (ready) return true;
   const auto& sensors = BoardConfig::ACTIVE.sensors;
   Wire.begin(sensors.i2cSda, sensors.i2cScl, sensors.i2cHz);
@@ -119,6 +139,7 @@ bool begin() {
 }
 
 bool powerButtonPressed() {
+  const ScopedBusLock lock;
   if (!ready || digitalRead(IRQ_PIN) != LOW) return powerKeyState.apply(0);
 
   uint8_t status = 0;
@@ -133,16 +154,19 @@ void waitForPowerButtonRelease() {
 }
 
 bool setDisplayPower(bool enabled) {
+  const ScopedBusLock lock;
   if (!ready && !begin()) return false;
   return updateBits(Register::LdoOn, ALDO_DISPLAY, enabled ? ALDO_DISPLAY : 0);
 }
 
 bool setAudioPower(bool enabled) {
+  const ScopedBusLock lock;
   if (!ready && !begin()) return false;
   return updateBits(Register::LdoOn, ALDO_AUDIO, enabled ? ALDO_AUDIO : 0);
 }
 
 bool readBatteryPercentage(uint16_t& percent) {
+  const ScopedBusLock lock;
   if (!ready && !begin()) return false;
   uint8_t status = 0;
   uint8_t rawPercent = 0xFF;
@@ -155,6 +179,7 @@ bool readBatteryPercentage(uint16_t& percent) {
 }
 
 bool externalPowerConnected(bool& connected) {
+  const ScopedBusLock lock;
   if (!ready && !begin()) return false;
   uint8_t status1 = 0;
   uint8_t status2 = 0;
@@ -164,6 +189,7 @@ bool externalPowerConnected(bool& connected) {
 }
 
 bool shutdown() {
+  const ScopedBusLock lock;
   if (!ready && !begin()) return false;
   const bool railsOff = updateBits(Register::LdoOn, ALDO_AUDIO | ALDO_DISPLAY, 0);
   return railsOff && updateBits(Register::Common, 0x01, 0x01);

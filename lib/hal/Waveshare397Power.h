@@ -4,6 +4,17 @@
 
 namespace Waveshare397Power {
 
+// Task-context guard for the shared PMIC / RTC / codec bus. It also protects
+// read-modify-write sequences, which Wire's per-transfer lock cannot cover.
+// Storage is static; the first caller is board initialization before workers.
+class ScopedBusLock {
+ public:
+  ScopedBusLock();
+  ~ScopedBusLock();
+  ScopedBusLock(const ScopedBusLock&) = delete;
+  ScopedBusLock& operator=(const ScopedBusLock&) = delete;
+};
+
 class PowerKeyState {
  public:
   // AXP2101 PKEY is active-low: the negative edge is press and the

@@ -49,9 +49,9 @@ class WaveshareStoreConfigTest(unittest.TestCase):
 
     def test_features_require_their_real_native_backends(self):
         flags = self.option(TARGET, "build_flags").split()
-        for feature in ("STORE", "TOX_CHAT", "ESP_CHAT"):
+        for feature in ("STORE", "TOX_CHAT", "ESP_CHAT", "RADIO"):
             self.assertIn(f"-DCROSSMUX_{feature}=1", flags)
-        for unavailable in ("LORA_CHAT", "RADIO"):
+        for unavailable in ("LORA_CHAT",):
             self.assertFalse(any(flag.startswith(f"-DCROSSMUX_{unavailable}=") for flag in flags))
         scripts = self.option(TARGET, "extra_scripts").split()
         for script in ("pre:scripts/configure_chat.py", "post:scripts/build_chat.py",
@@ -59,7 +59,7 @@ class WaveshareStoreConfigTest(unittest.TestCase):
             self.assertEqual(scripts.count(script), 1)
             self.assertTrue((ROOT / script.split(":", 1)[1]).is_file())
 
-    def test_existing_codec_feedback_is_kept_without_claiming_radio_audio(self):
+    def test_codec_feedback_and_radio_share_the_native_audio_backend(self):
         self.assertIn("-DCROSSPOINT_CAP_SOUND_FEEDBACK=1", self.option(TARGET, "build_flags").split())
         self.assertIn("AudioManager=symlink://freeink-sdk/libs/hardware/AudioManager",
                       self.option(TARGET, "lib_deps").split())

@@ -327,11 +327,23 @@ class Player::Impl {
       work->framer.reset(work->input);
       queue.reset(work->queued);
       lastDecoded = millis();
-      // HalRadioAudio currently supports only PaperMono's single-pin buzzer.
-      // Keep the prior Standard profile available for reproducible comparisons;
-      // a future speaker/codec backend must select its own conditioning here.
-      work->loudness.configure(output, this, SpeakerLoudness::Profile::Buzzer);
-      LOG_INF("RADIO", "buzzer profile: 350-4500 Hz, bounded 6x compression, 24 kHz output");
+      // Conditioning follows the HAL's actual output, without board-specific
+      // SDK access or changing the shared 24 kHz sample timeline.
+      switch (HalRadioAudio::outputKind()) {
+        case HalRadioAudio::OutputKind::None:
+          // start() rejects unsupported hardware before creating this worker.
+          // Keep a mismatched backend fail-closed if it nevertheless gets here.
+          work->loudness.configure(nullptr, nullptr);
+          break;
+        case HalRadioAudio::OutputKind::Buzzer:
+          work->loudness.configure(output, this, SpeakerLoudness::Profile::Buzzer);
+          LOG_INF("RADIO", "buzzer profile: 350-4500 Hz, bounded 6x compression, 24 kHz output");
+          break;
+        case HalRadioAudio::OutputKind::Speaker:
+          work->loudness.configure(output, this, SpeakerLoudness::Profile::Standard);
+          LOG_INF("RADIO", "speaker profile: 120 Hz high-pass, bounded 2.75x makeup, 24 kHz output");
+          break;
+      }
       if (work->loudness.failed()) {
         fail(Error::Audio);
       } else if (createWorker(audioEntry, "AirTunePCM", OUTPUT_STACK_BYTES, this, 2, &audioTask) != pdPASS) {

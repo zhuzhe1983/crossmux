@@ -7,6 +7,10 @@
 #include <sys/time.h>
 #include <time.h>
 
+#if FREEINK_DEVICE_WAVESHARE_EPAPER_397
+#include "Waveshare397Power.h"
+#endif
+
 // Disable legacy translating inlines so raw lwIP APIs can be used in TCP/IP context.
 #define ESP_NETIF_COMPONENT_BUILD
 #include <esp_sntp.h>
@@ -79,6 +83,9 @@ bool epochToRtcDateTime(const time_t epoch, Rtc::DateTime& rtcTime) {
 }  // namespace
 
 void HalClock::begin() {
+#if FREEINK_DEVICE_WAVESHARE_EPAPER_397
+  const Waveshare397Power::ScopedBusLock busLock;
+#endif
   _rtcAvailable = _sdkRtc.begin();
   LOG_INF("CLK", _rtcAvailable ? "External RTC found" : "Using software clock");
 
@@ -95,6 +102,9 @@ time_t HalClock::nowUtc() const {
 bool HalClock::hasValidTime() const { return nowUtc() != 0; }
 
 bool HalClock::restoreSystemTimeFromRtc() {
+#if FREEINK_DEVICE_WAVESHARE_EPAPER_397
+  const Waveshare397Power::ScopedBusLock busLock;
+#endif
   if (!_rtcAvailable) return false;
 
   Rtc::DateTime rtcTime{};
@@ -110,6 +120,9 @@ bool HalClock::restoreSystemTimeFromRtc() {
 }
 
 bool HalClock::updateRtcFromSystemTime() {
+#if FREEINK_DEVICE_WAVESHARE_EPAPER_397
+  const Waveshare397Power::ScopedBusLock busLock;
+#endif
   if (!_rtcAvailable) return true;
 
   const time_t now = nowUtc();

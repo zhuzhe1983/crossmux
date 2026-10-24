@@ -38,10 +38,10 @@ fixed 512-sample output block. The last partial input interval is held on clean
 EOF, at most one output sample beyond the exact fractional duration.
 
 Before the PCM queue, `SpeakerLoudness` conditions the 24 kHz mono signal.
-The Player selects its experimental **Buzzer** profile because the current
-`HalRadioAudio` supports only PaperMono's single-pin buzzer. A future speaker or
-codec backend must select appropriate conditioning instead of inheriting this
-choice. No Lua API or AirTune package update is required.
+The Player selects a profile from `HalRadioAudio::outputKind()`: PaperMono's
+single-pin buzzer uses **Buzzer**, and the Waveshare 3.97 ES8311 speaker uses
+**Standard**. An unsupported output fails closed. Board-specific codec access
+stays in the HAL; this selection requires no Lua API or package format change.
 
 The Buzzer profile applies second-order Butterworth high-pass at 350 Hz and
 low-pass at 4500 Hz before a bounded compressor. Its absolute-amplitude detector
@@ -58,9 +58,9 @@ A 120-sample (5 ms) lookahead limits peaks through a smoothed gain envelope
 separately counted 0.94 full-scale emergency guard. This raises the digital
 peak target only about 1.54 dB versus the prior profile; any additional speech
 clarity comes from spectral/dynamic processing, not higher voltage or a new
-amplifier. The prior **Standard** profile remains available to tests and offline
-comparisons: 120 Hz one-pole high-pass, fixed 2.75x makeup, 0.72 peak target and
-0.80 emergency guard. It is not a second selectable AirTune setting.
+amplifier. The **Standard** speaker profile uses a 120 Hz one-pole high-pass,
+fixed 2.75x makeup, 0.72 peak target and 0.80 emergency guard. Profiles follow
+the hardware output; they are not a selectable AirTune setting.
 
 Both profiles preserve the sample rate and output count. There is no time
 stretch, pitch shift, note extraction or conversion to MIDI. `finish()` emits
@@ -81,6 +81,22 @@ stage only attenuates, independently of the conditioner. Applications can
 restore saved volume, including zero. The existing single-pin PDM encoder and
 hardware clock configuration are unchanged. These numbers describe digital
 amplitude, not a calibrated acoustic volume percentage or maximum sound pressure.
+
+On Waveshare 3.97, `HalAudioOutput` owns both short cues and the continuous
+speaker stream. Starting a stream first stops the 16 kHz cue; cues cannot
+interrupt the worker's 24 kHz output. RTC, PMIC and codec control share a static
+recursive I2C lock, while sample writes never take that lock. Stream volume is
+linear PCM attenuation at 0–100 with the ES8311 DAC fixed at 0 dB. The SDK
+duplicates mono into stereo slots at the actual 24 kHz hardware rate and
+changes DAC OSR together with MCLK. See
+[the SDK stream contract](../../freeink-sdk/docs/waveshare-audio-stream.md) for
+the clock evidence, bounded DMA writes, cleanup and failure behavior.
+
+The Wave HAL adds no task or sample queue. The SDK uses a 256-byte stack
+conversion block and a 1,920-byte DMA sample ring, plus IDF descriptor/channel
+overhead. These DMA resources must reside in internal memory and are released
+when streaming ends; the existing decoder workspace and workers remain in
+PSRAM on the tested S3 build. Short sounds resume only after stream cleanup.
 
 The service accepts direct HTTP(S) MP3 streams. It bounds initial/redirect URLs,
 follows at most three redirects, rejects HTTPS downgrades, requests no ICY

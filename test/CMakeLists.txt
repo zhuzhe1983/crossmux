@@ -291,6 +291,8 @@ add_test(NAME CrossStoreWeReadService
   COMMAND ${Python3_EXECUTABLE} ${REPO_ROOT}/test/weread_covers/test_service.py)
 add_test(NAME BuzzerPcmStream
   COMMAND ${Python3_EXECUTABLE} ${REPO_ROOT}/test/buzzer_pcm/test_stream.py)
+add_test(NAME WaveshareAudioStream
+  COMMAND ${Python3_EXECUTABLE} ${REPO_ROOT}/test/waveshare_audio/test_waveshare_audio.py)
 add_test(NAME RadioMp3Decoder
   COMMAND ${Python3_EXECUTABLE} ${REPO_ROOT}/lib/RadioDecoder/test/test_radio.py)
 # CrossStore is a separate source repository. Enable integration tests when a
