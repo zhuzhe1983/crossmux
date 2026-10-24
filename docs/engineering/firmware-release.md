@@ -140,3 +140,151 @@ official packaging path are mandatory.
 CI, indexes, and checksum checks do not replace real-device acceptance. Before
 making a Nightly pipeline production-critical, test OTA and reboot on every S3
 target, one X3/X4, both content profiles, and one wrong-board negative case.
+
+## Personal CrossStore three-device prereleases
+
+The separate workflow
+[`fork-store-release.yml`](../../.github/workflows/fork-store-release.yml), named
+**CrossStore Three-Device Release**, targets `zhuzhe1983/crossmux`. It builds on
+GitHub-hosted Ubuntu runners and needs no COS or self-hosted runner secrets.
+It does not modify the official target table, supported Stable devices,
+`stable`/`nightly` tags, rolling OTA indexes, or retention policy above.
+
+| Device | PlatformIO environment | Embedded board tag | Artifact prefix |
+| --- | --- | --- | --- |
+| M5Stack PaperMono | `papermono_store` | `papermono` | `papermono-` |
+| M5Stack PaperS3 | `papers3_store` | `papers3` | `papers3-` |
+| Waveshare ESP32-S3-ePaper-3.97 | `waveshare_epaper_397_store` | `waveshare_epaper_397` | `waveshare-epaper-397-` |
+
+All three are ESP32-S3 / 16 MiB Store builds with the current `partitions.csv`
+layout. PaperS3's SDK runtime model is `m5paper_s3`; it has its own binary,
+not the PaperMono image. This matrix is independent of the official Nightly
+matrix because its environments include `CROSSMUX_STORE=1` and the optional
+services selected by each board's Store profile. PaperS3's configured upload
+mode is QIO; Mono and Waveshare use DIO. The manifest records that difference;
+the packager preserves each built bootloader header and does not rewrite it.
+
+Run the workflow on the intended committed branch or tag. GitHub dispatch
+resolves that ref to `GITHUB_SHA`; every checkout explicitly uses that immutable
+SHA. `publish_release=false` builds and retains Actions artifacts for 14 days
+without creating a GitHub Release. The default `true` publishes only after all
+three matrix jobs succeed. The workflow must first be available on the fork's
+default branch for GitHub's normal manual-dispatch entry point; choosing another
+ref must select a revision containing this workflow and its scripts.
+See [GitHub's dispatch contract](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#workflow_dispatch).
+
+The first release does not require merging this work into the fork's `main`.
+After publishing the complete feature-branch commit and its SDK dependency,
+push one new lightweight tag named `crossstore-build-<full-40-character-sha>`
+at that exact commit. The tag's `push` event runs the workflow from the tagged
+commit, including when it has never existed on the default branch. Ordinary
+branch pushes do not trigger this workflow. For example, from the prepared
+feature branch (commands below publish the build request):
+
+```bash
+release_sha=$(git rev-parse HEAD)
+python3 scripts/fork_store_release.py preflight --sha "$release_sha"
+git tag "crossstore-build-$release_sha" "$release_sha"
+git push origin "refs/tags/crossstore-build-$release_sha"
+```
+
+The prepare job requires an exact SHA match and a new, non-forced, non-deleted
+tag event. Do not move or force-push a build tag; use Actions' **Re-run all jobs**
+for the same commit, or create a new source-bound tag for a new commit. Artifact
+names include the run attempt, so rerunning only failed jobs cannot combine
+earlier successful build assets with the new attempt. A build-tag run
+always requests publication, but still requires all three successful builds
+and both local and downloaded-asset verification. Output release tags use
+`crossstore-...`, which does not match the `crossstore-build-*` input pattern.
+This also keeps them outside the official workflow's stable version tags.
+The first tag push must use the maintainer's normal authenticated Git push;
+events made with a workflow's `GITHUB_TOKEN` normally do not start another
+workflow. See [GitHub's push-event contract](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#push)
+and [workflow-trigger token rules](https://docs.github.com/en/actions/how-tos/writing-workflows/choosing-when-your-workflow-runs/triggering-a-workflow).
+
+### Reproducible source readiness
+
+The parent repository and SDK must be committed and publicly fetchable by the
+workflow. Publishing the parent alone does not publish uncommitted submodule
+changes. Commit/publish the required SDK changes to an accessible repository,
+set the parent's SDK gitlink to that exact commit, and commit the parent changes.
+If the SDK commit lives in a fork, `.gitmodules` must point to that reachable
+repository. A local successful build is insufficient evidence that a fresh
+Actions checkout can build it.
+
+For the SDK, publish the required changes on a feature branch of an accessible
+fork first (for example `zhuzhe1983/freeink-sdk`), update `.gitmodules` to that
+repository and the parent gitlink to its exact commit, then publish the parent
+feature branch. Neither repository's `main` needs to change. Test a fresh
+recursive checkout of that parent revision before creating the build tag;
+verify SDK `HEAD` equals `git ls-tree HEAD freeink-sdk`. An existing local SDK
+remote or base commit does not prove uncommitted SDK changes are available to
+Actions. A public SDK fork avoids requiring extra private-repository tokens.
+
+Fresh-checkout inputs include the vendored `lib/CrossStoreLua` and
+`lib/RadioDecoder` sources and licenses, the CrossStore runtime/services/HAL,
+`assets/app-icons/appstore/icon.csi`, and the six preprocessed semantic-icon
+`icons.h` files used by `SemanticAppIcons.cpp`. These are repository inputs,
+not files retrieved from a developer's `~/Workspace/CrossStore` checkout.
+PIO hooks regenerate the ignored Store icon, woodfish PCM, HTML, user-guide and
+i18n headers. Those hooks need only the Python standard library; Pillow is
+needed when authoring new icon assets, not for this release build. Tox and cmp
+are downloaded by `scripts/configure_chat.py` from fixed revisions with checked
+SHA-256 values. A previously populated `.cache/chat-deps` is not required.
+
+`scripts/fork_store_release.py preflight --sha <full-commit-sha>` rejects a
+different checkout SHA, dirty/untracked source in either repository, a gitlink
+that differs from the SDK checkout, `platformio.local.ini`, a missing Store flag,
+an implicit/unsafe firmware version, and a different chip/flash/partition
+configuration. CI starts with fresh build outputs and isolated PlatformIO
+toolchains; no cached firmware is reused. Build dependencies follow the pinned
+platform and existing checksum-verified chat download scripts. The firmware
+version comes from the resolved `CROSSPOINT_VERSION` flag and must appear in the
+image; Arduino's `esp_app_desc.version` is a framework build ID and is not used
+as the CrossMux version.
+
+### Artifacts and publication gates
+
+For each target the packager emits seven files: `*-firmware.bin`,
+`*-bootloader.bin`, `*-partitions.bin`, `*-boot_app0.bin`,
+`*-full-install.bin`, `*-install-manifest.json`, and `*-SHA256SUMS`.
+The manifest records exact CrossMux/SDK SHAs, board/model/environment, configured
+version, flash profile, and each image's role, offset, length and SHA-256.
+The combined `crossstore-release.json` is an inventory of these three manifests;
+it is deliberately not an official OTA index or an ESP Web Tools manifest.
+
+`firmware.bin` is the application image for the corresponding device's existing
+compatible CrossMux installation. Full installation uses segments at `0x0`,
+`0x8000`, `0xE000`, and `0x10000`, or the merged `full-install.bin` at `0x0`.
+The merged image pads gaps with `0xFF`, including the NVS region, so it replaces
+bootloader/partition/NVS/OTA state. Back up Flash first and use the application
+image for routine updates. The images do not include TF-card contents or Lua
+application data. Partition changes require a separate migration decision.
+
+The packager reuses the official chip/board-tag and CSV layout checks, then
+also verifies the emitted partition binary (including its MD5, types, offsets,
+overlaps and bounds), S3 bootloader, app-slot limit, and byte-for-byte merged
+segments. Aggregation requires exactly all three targets, the dispatched
+CrossMux SHA and one SDK SHA, correct sizes/hashes, and an exact filename
+allowlist. Extra files, symlinks, stale output directories and missing targets
+fail the job rather than being uploaded.
+
+The publish job alone has `contents: write`. It creates a new lightweight tag
+`crossstore-<full-sha>-<run-id>-<attempt>` at the built SHA; an existing tag causes
+failure. It uploads a draft prerelease, downloads and validates the uploaded
+bytes, rechecks the remote tag's SHA, then makes the prerelease public without
+marking it Latest. A failed upload/verification may leave a draft/tag for manual
+inspection; it never overwrites an older release or changes an OTA index.
+GitHub artifact digest mismatches are only warnings, which is why the explicit
+post-download validation is mandatory here. See the
+[artifact validation documentation](https://docs.github.com/en/actions/tutorials/store-and-share-data#validating-artifacts)
+and [GitHub CLI release options](https://cli.github.com/manual/gh_release_create).
+These are checksum and source-provenance checks, not a detached-signature or
+secure-boot signing service; the workflow does not use a firmware signing key.
+
+Run `python3 -m unittest discover -s scripts/tests -p test_fork_store_release.py`
+for the target mapping, source-bound trigger checks, fresh-checkout build
+inputs, clean-source rejection, cross-board/chip rejection,
+partition corruption, slot overflow, merged bytes, hash/manifest/source-SHA
+consistency and workflow publication gates. These host checks do not establish
+cloud build success or hardware acceptance; record each separately.

@@ -1,0 +1,172 @@
+name: CrossStore Three-Device Release
+
+on:
+  push:
+    tags:
+      - 'crossstore-build-*'
+  workflow_dispatch:
+    inputs:
+      publish_release:
+        description: 'Publish a prerelease after all three builds and asset checks pass'
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: crossstore-three-device-release
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    if: github.repository == 'zhuzhe1983/crossmux'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      matrix: ${{ steps.source.outputs.matrix }}
+      sdk_sha: ${{ steps.source.outputs.sdk_sha }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          submodules: recursive
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.14'
+      - name: Validate the dispatch or new SHA-bound build tag
+        run: |
+          python3 scripts/fork_store_release.py trigger --event "$GITHUB_EVENT_NAME" \
+            --ref "$GITHUB_REF" --sha "$GITHUB_SHA" --event-file "$GITHUB_EVENT_PATH"
+      - id: source
+        name: Validate committed source, SDK gitlink and Store targets
+        run: python3 scripts/fork_store_release.py preflight --sha "$GITHUB_SHA" --output "$GITHUB_OUTPUT"
+      - name: Test release packaging and rejection paths
+        run: python3 -m unittest discover -s scripts/tests -p test_fork_store_release.py
+      - name: Check SDK display transactions with the Linux linker
+        run: python3 freeink-sdk/libs/display/EpdiyLcd/test/host/test_transactions.py
+
+  build:
+    needs: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.prepare.outputs.matrix) }}
+    name: Store / ${{ matrix.targetId }}
+    env:
+      TARGET_ID: ${{ matrix.targetId }}
+      PIO_ENVIRONMENT: ${{ matrix.environment }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          submodules: recursive
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.14'
+      - name: Isolate toolchains and start from fresh build outputs
+        run: |
+          set -euo pipefail
+          test ! -e .pio/build
+          test ! -e dist/fork-store
+          echo "PLATFORMIO_CORE_DIR=$RUNNER_TEMP/platformio-$TARGET_ID" >> "$GITHUB_ENV"
+          echo "TMPDIR=$RUNNER_TEMP" >> "$GITHUB_ENV"
+      - run: python3 -m pip install pioarduino==6.2.0
+      - run: python3 scripts/fork_store_release.py preflight --sha "$GITHUB_SHA"
+      - run: python3 scripts/patch_pioarduino_cache.py --prepare-platform
+      - name: Build the AppStore firmware
+        run: pio run -e "$PIO_ENVIRONMENT"
+      - name: Package and verify this exact checkout
+        run: |
+          python3 scripts/fork_store_release.py package --target "$TARGET_ID" \
+            --sha "$GITHUB_SHA" --output "dist/fork-store/$TARGET_ID"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fork-store-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.targetId }}
+          path: dist/fork-store/${{ matrix.targetId }}/
+          if-no-files-found: error
+          include-hidden-files: false
+          retention-days: 14
+
+  publish:
+    needs: [prepare, build]
+    if: github.event_name == 'push' || inputs.publish_release
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    env:
+      SDK_SHA: ${{ needs.prepare.outputs.sdk_sha }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.14'
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: fork-store-${{ github.run_id }}-${{ github.run_attempt }}-*
+          path: artifacts
+          merge-multiple: true
+      - name: Require all three matching manifests and exact asset allowlist
+        run: |
+          python3 scripts/fork_store_release.py assemble --input artifacts --output publish \
+            --sha "$GITHUB_SHA" --sdk-sha "$SDK_SHA"
+          python3 scripts/fork_store_release.py verify --input publish \
+            --sha "$GITHUB_SHA" --sdk-sha "$SDK_SHA"
+      - name: Prepare release notes
+        run: |
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          lines = ['# CrossMux with AppStore', '',
+                   'Experimental PaperMono / PaperS3 / Waveshare ESP32-S3-ePaper-3.97 builds.', '',
+                   'Source: `' + os.environ['GITHUB_SHA'] + '`',
+                   'SDK: `' + os.environ['SDK_SHA'] + '`', '',
+                   '| Device | Environment | Version |', '| --- | --- | --- |']
+          for path in sorted(Path('publish').glob('*-install-manifest.json')):
+              item = json.loads(path.read_text())
+              lines.append('| ' + ' | '.join(item[k] for k in ('deviceSlug', 'environment', 'version')) + ' |')
+          lines += ['', 'Use the matching device firmware.bin for an existing compatible CrossMux installation.',
+                    'Full-install.bin starts at 0x0 and replaces the bootloader, partition table and NVS/OTA data.',
+                    'Back up Flash before first installation. Do not use the full image for routine updates.',
+                    'These releases do not update the official stable/nightly OTA indexes.',
+                    'Build/checksum success does not replace real-device acceptance.', '',
+                    'Device checks: Waveshare 3.97 boot, original whole-device FAT32 card, store, buttons and EPUB reading passed on the corresponding source.',
+                    'Waveshare audio, paired chat, sustained USB transfers and sleep cycles still need device testing.',
+                    'PaperMono buzzer playback remains quiet in listening tests; this release does not claim to resolve its loudness.',
+                    'PaperS3 has earlier store acceptance; the latest build still needs renewed device testing.', '',
+                    'The app store is experimental: the preview downloader skips HTTPS certificate verification and packages are not publisher-signed.',
+                    'Architecture and limitations: https://github.com/0x1abin/crossmux/issues/433', '']
+          Path('release-body.md').write_text('\n'.join(lines))
+          PY
+      - name: Create a new SHA-bound tag and draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag="crossstore-${GITHUB_SHA}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          # Creating the ref fails if it already exists; never trust a moved tag.
+          gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" \
+            -f "ref=refs/tags/$tag" -f "sha=$GITHUB_SHA" > "$RUNNER_TEMP/crossstore-tag.json"
+          assets=(publish/*)
+          gh release create "$tag" "${assets[@]}" --repo "$GITHUB_REPOSITORY" \
+            --verify-tag --target "$GITHUB_SHA" --draft --prerelease --latest=false \
+            --title "CrossMux AppStore ${GITHUB_SHA::7} #$GITHUB_RUN_NUMBER" --notes-file release-body.md
+          echo "RELEASE_TAG=$tag" >> "$GITHUB_ENV"
+      - name: Verify uploaded bytes before making the prerelease public
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --dir downloaded
+          python3 scripts/fork_store_release.py verify --input downloaded \
+            --sha "$GITHUB_SHA" --sdk-sha "$SDK_SHA"
+          test "$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG" --jq .object.sha)" = "$GITHUB_SHA"
+          gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --draft=false --prerelease --latest=false
