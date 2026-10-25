@@ -85,7 +85,7 @@ pio run -e gh_release
 pio run -e gh_release -t upload
 ```
 
-应用固件位于 `.pio/build/<环境>/firmware.bin`。本分支共 43 个构建入口：保留官方的 35 个入口（九个发布目标各有 Dev、Stable、Nightly，另有两个仅开发板型和六个模拟器），并增加 PaperS3、M5Paper v1.1、两个聊天配置和四个商店配置。版本与 Git 哈希自动生成：Stable 为 `<基础版本>`，Nightly 为 `<基础版本>-rc+<7位SHA>`，Dev 为 `<基础版本>-dev-<分支>-<7位SHA>`。其它板型见[构建文档](./docs/engineering/build-system.md)。
+应用固件位于 `.pio/build/<环境>/firmware.bin`。本分支共 52 个构建入口：保留官方的 35 个入口（九个发布目标各有 Dev、Stable、Nightly，另有两个仅开发板型和六个模拟器），并增加 PaperS3、M5Paper v1.1、两个聊天配置和13 个商店配置。版本与 Git 哈希自动生成：Stable 为 `<基础版本>`，Nightly 为 `<基础版本>-rc+<7位SHA>`，Dev 为 `<基础版本>-dev-<分支>-<7位SHA>`。未实测的商店目标标为 Alpha，详见[设备列表](./docs/engineering/crossstore-device-matrix.md)。其它板型见[构建文档](./docs/engineering/build-system.md)。
 
 X4 Pro 与 Metalio E-Ink 4 构建命令：
 

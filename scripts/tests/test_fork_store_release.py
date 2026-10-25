@@ -94,9 +94,11 @@ class ForkStoreReleaseTest(unittest.TestCase):
                 shutil.copyfile(path, output / path.name)
         return output
 
-    def test_fixed_four_store_targets_preserve_official_channels(self):
+    def test_all_integrated_store_targets_preserve_official_channels(self):
         self.assertEqual([v['environment'] for v in release.matrix()['include']],
-                         ['papermono_store', 'papers3_store', 'waveshare_epaper_397_store', 'm5paper_v11_store'])
+                         ['papermono_store', 'papers3_store', 'waveshare_epaper_397_store', 'm5paper_v11_store',
+                          'xteink_store', 'sticky_store', 'x4pro_store', 'eego_a4_store', 'murphy_m4_store',
+                          'metalio_eink4_store', 'readpico_store', 'x4c_store', 'lilygo_t5s3_store'])
         self.assertNotIn('m5stack_papers3', nightly_targets.TARGETS)
         self.assertEqual(set(nightly_targets.targets_for('stable')), set(nightly_targets.targets_for('nightly')))
         self.assertEqual(len(nightly_targets.targets_for('stable')), 9)
@@ -215,8 +217,8 @@ class ForkStoreReleaseTest(unittest.TestCase):
     def test_complete_package_offsets_checksums_and_merged_bytes(self):
         output = self.complete()
         summary = release.verify_set(output, SHA, SDK_SHA)
-        self.assertEqual(len(summary['targets']), 4)
-        self.assertEqual(len(list(output.iterdir())), 28)
+        self.assertEqual(len(summary['targets']), 13)
+        self.assertEqual(len(list(output.iterdir())), 91)
         release.json_write(output / 'crossstore-release.json', summary)
         self.assertEqual(release.verify_set(output, SHA, SDK_SHA, aggregated=True), summary)
         for target in release.TARGETS.values():
@@ -224,6 +226,16 @@ class ForkStoreReleaseTest(unittest.TestCase):
             full = (output / f'{slug}-full-install.bin').read_bytes()
             self.assertEqual(full[0x10000:], (output / f'{slug}-firmware.bin').read_bytes())
             self.assertEqual(full[0x9000:0xe000], b'\xff' * 0x5000)
+
+    def test_alpha_status_cannot_be_promoted_by_manifest(self):
+        output = self.complete()
+        path = output / 'xteink-install-manifest.json'
+        manifest = json.loads(path.read_text())
+        self.assertEqual(manifest['validationStatus'], 'alpha-unverified')
+        manifest['validationStatus'] = 'prior-hardware-record'
+        release.json_write(path, manifest)
+        with self.assertRaisesRegex(ValueError, 'validationStatus'):
+            release.verify_set(output, SHA, SDK_SHA)
 
     def test_classic_esp32_offset_chip_frequency_and_erased_prefix(self):
         output = self.complete()

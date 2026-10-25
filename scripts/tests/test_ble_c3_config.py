@@ -241,6 +241,8 @@ int main() {
             "default", "gh_release", "gh_release_rc", "x4c", "lilygo_t5s3",
             "papers3", "papermono_chat", "papers3_chat", "papermono_store", "papers3_store",
             "waveshare_epaper_397_store", "m5paper_v11", "m5paper_v11_store",
+            "xteink_store", "sticky_store", "x4pro_store", "x4c_store", "eego_a4_store", "murphy_m4_store",
+            "metalio_eink4_store", "readpico_store", "lilygo_t5s3_store",
             *{
                 environment
                 for board in ("sticky", "x4pro", "papermono", "eego_a4", "murphy_m4",

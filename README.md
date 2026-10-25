@@ -85,7 +85,7 @@ pio run -e gh_release
 pio run -e gh_release -t upload
 ```
 
-The application binary is `.pio/build/<environment>/firmware.bin`. This fork has 43 build entries: the 35 upstream entries (Dev, Stable and Nightly for nine release targets, two development-only boards and six simulators), plus PaperS3 and M5Paper v1.1, two chat profiles and four Store profiles. Versions and Git hashes are generated automatically: Stable `<base>`, Nightly `<base>-rc+<sha7>`, Dev `<base>-dev-<branch>-<sha7>`. For other boards, see [build-system.md](./docs/engineering/build-system.md).
+The application binary is `.pio/build/<environment>/firmware.bin`. This fork has 52 build entries: the 35 upstream entries (Dev, Stable and Nightly for nine release targets, two development-only boards and six simulators), plus PaperS3 and M5Paper v1.1, two chat profiles and 13 Store profiles. Versions and Git hashes are generated automatically: Stable `<base>`, Nightly `<base>-rc+<sha7>`, Dev `<base>-dev-<branch>-<sha7>`. Unverified Store targets are labelled Alpha; see the [device matrix](./docs/engineering/crossstore-device-matrix.md). For other boards, see [build-system.md](./docs/engineering/build-system.md).
 
 For X4 Pro and Metalio E-Ink 4:
 

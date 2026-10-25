@@ -1,4 +1,4 @@
-name: CrossStore Four-Device Release
+name: CrossStore Device Release
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       publish_release:
-        description: 'Publish a prerelease after all four builds and asset checks pass'
+        description: 'Publish a prerelease after all device builds and asset checks pass'
         required: true
         default: true
         type: boolean
@@ -16,7 +16,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: crossstore-four-device-release
+  group: crossstore-device-release
   cancel-in-progress: false
 
 jobs:
@@ -118,7 +118,7 @@ jobs:
           pattern: fork-store-${{ github.run_id }}-${{ github.run_attempt }}-*
           path: artifacts
           merge-multiple: true
-      - name: Require all four matching manifests and exact asset allowlist
+      - name: Require all matching device manifests and exact asset allowlist
         run: |
           python3 scripts/fork_store_release.py assemble --input artifacts --output publish \
             --sha "$GITHUB_SHA" --sdk-sha "$SDK_SHA"
@@ -130,13 +130,16 @@ jobs:
           import json, os
           from pathlib import Path
           lines = ['# CrossMux with AppStore', '',
-                   'Experimental PaperMono / PaperS3 / Waveshare ESP32-S3-ePaper-3.97 / M5Paper v1.1 builds.', '',
+                   'AppStore builds for all hardware targets currently integrated in this CrossMux fork.', '',
                    'Source: `' + os.environ['GITHUB_SHA'] + '`',
                    'SDK: `' + os.environ['SDK_SHA'] + '`', '',
-                   '| Device | Environment | Version |', '| --- | --- | --- |']
+                   'Only PaperMono, PaperS3 and Waveshare 3.97 have prior physical test records from this fork maintainer.',
+                   'All other models are **Alpha — no maintainer hardware test**. Upstream records do not establish acceptance of this Store build.', '',
+                   '| Device | Environment | Version | Validation |', '| --- | --- | --- | --- |']
           for path in sorted(Path('publish').glob('*-install-manifest.json')):
               item = json.loads(path.read_text())
-              lines.append('| ' + ' | '.join(item[k] for k in ('deviceSlug', 'environment', 'version')) + ' |')
+              status = 'Prior hardware record; current build acceptance pending' if item['deviceSlug'] in ('papermono', 'papers3', 'waveshare-epaper-397') else 'Alpha — not physically tested'
+              lines.append('| ' + ' | '.join(item[k] for k in ('deviceSlug', 'environment', 'version')) + ' | ' + status + ' |')
           lines += ['', 'Use the matching device firmware.bin for an existing compatible CrossMux installation.',
                     'Full-install.bin starts at 0x0 and replaces the bootloader, partition table and NVS/OTA data.',
                     'Back up Flash before first installation. Do not use the full image for routine updates.',
@@ -151,7 +154,9 @@ jobs:
                     'M5Paper has native 16-gray icons, Lua apps and ESP-NOW; no Tox wifi_chat, USB disk, speaker/microphone or LoRa support is advertised.',
                     'M5Paper full images include an erased 0x1000 prefix: flash the merged image at 0x0, or the separate bootloader at 0x1000 (S3 bootloaders start at 0x0).', '',
                     'The app store is experimental: the preview downloader skips HTTPS certificate verification and packages are not publisher-signed.',
-                    'Architecture and limitations: https://github.com/0x1abin/crossmux/issues/433', '']
+                    'Architecture and limitations: https://github.com/0x1abin/crossmux/issues/433',
+                    'Report firmware issues with model, version, reproduction steps and logs: https://github.com/zhuzhe1983/crossmux/issues/new',
+                    'Ink4 Plus / 4G is not the supported SPI Metalio E-Ink 4. Plus hardware revision and modem support remain under review; no Plus image is included.', '']
           Path('release-body.md').write_text('\n'.join(lines))
           PY
       - name: Create a new SHA-bound tag and draft release

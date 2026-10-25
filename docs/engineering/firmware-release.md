@@ -193,11 +193,11 @@ CI, indexes, and checksum checks do not replace real-device acceptance. Before
 making a Nightly pipeline production-critical, test OTA and reboot on every S3
 target, one X3/X4, both content profiles, and one wrong-board negative case.
 
-## Personal CrossStore four-device prereleases
+## Personal CrossStore device prereleases
 
 The separate workflow
 [`fork-store-release.yml`](../../.github/workflows/fork-store-release.yml), named
-**CrossStore Four-Device Release**, targets `zhuzhe1983/crossmux`. It builds on
+**CrossStore Device Release**, targets `zhuzhe1983/crossmux`. It builds on
 GitHub-hosted Ubuntu runners and needs no COS or self-hosted runner secrets.
 It does not modify the official target table, supported Stable devices,
 `stable`/`nightly` tags, rolling OTA indexes, or retention policy above.
@@ -220,11 +220,20 @@ mode is QIO; Mono and Waveshare use DIO. The manifest records that difference;
 M5Paper uses QIO/40 MHz and the S3 builds use 80 MHz.
 The packager preserves each built bootloader header and does not rewrite it.
 
+The full matrix now also includes X3/X4, Sticky, X4 Pro, X4 Classic, EEGO A4,
+Murphy M4, Metalio E-Ink 4, Read Pico and LilyGo T5 S3: thirteen images for
+fourteen models. These additional targets are Alpha, without maintainer physical
+acceptance. See [crossstore-device-matrix.md](crossstore-device-matrix.md) for the
+complete environment/capability list and the separate pending Ink4 Plus/ML307 port.
+Manifests record `validationStatus`; this is a historical hardware-record label,
+not acceptance of the newly built binary. The issue link in each website selection
+prefills model, version and source revisions.
+
 Run the workflow on the intended committed branch or tag. GitHub dispatch
 resolves that ref to `GITHUB_SHA`; every checkout explicitly uses that immutable
 SHA. `publish_release=false` builds and retains Actions artifacts for 14 days
 without creating a GitHub Release. The default `true` publishes only after all
-four matrix jobs succeed. The workflow must first be available on the fork's
+all matrix jobs succeed. The workflow must first be available on the fork's
 default branch for GitHub's normal manual-dispatch entry point; choosing another
 ref must select a revision containing this workflow and its scripts.
 See [GitHub's dispatch contract](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#workflow_dispatch).
@@ -249,7 +258,7 @@ tag event. Do not move or force-push a build tag; use Actions' **Re-run all jobs
 for the same commit, or create a new source-bound tag for a new commit. Artifact
 names include the run attempt, so rerunning only failed jobs cannot combine
 earlier successful build assets with the new attempt. A build-tag run
-always requests publication, but still requires all four successful builds
+always requests publication, but still requires all successful builds
 and both local and downloaded-asset verification. Output release tags use
 `crossstore-...`, which does not match the `crossstore-build-*` input pattern.
 This also keeps them outside the official workflow's stable version tags.
@@ -311,7 +320,7 @@ For each target the packager emits seven files: `*-firmware.bin`,
 `*-full-install.bin`, `*-install-manifest.json`, and `*-SHA256SUMS`.
 The manifest records exact CrossMux/SDK SHAs, board/model/environment, configured
 version, flash profile, and each image's role, offset, length and SHA-256.
-The combined `crossstore-release.json` is an inventory of these four manifests;
+The combined `crossstore-release.json` is an inventory of all device manifests;
 it is deliberately not an official OTA index or an ESP Web Tools manifest.
 
 `firmware.bin` is the application image for the corresponding device's existing
@@ -327,7 +336,7 @@ application data. Partition changes require a separate migration decision.
 The packager reuses the official chip/board-tag and CSV layout checks, then
 also verifies the emitted partition binary (including its MD5, types, offsets,
 overlaps and bounds), chip-specific bootloader, app-slot limit, and byte-for-byte merged
-segments. Aggregation requires exactly all four targets, the dispatched
+segments. Aggregation requires exactly all configured targets, the dispatched
 CrossMux SHA and one SDK SHA, correct sizes/hashes, and an exact filename
 allowlist. Extra files, symlinks, stale output directories and missing targets
 fail the job rather than being uploaded.

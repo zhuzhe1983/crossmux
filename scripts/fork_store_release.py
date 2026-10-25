@@ -32,6 +32,24 @@ TARGETS = {
 }
 
 
+# Every hardware target currently integrated in CrossMux gets an isolated Store
+# image. SDK-only profiles are not firmware support and do not enter this list.
+for target_id, environment in (
+        ('xteink_x4', 'xteink_store'), ('sticky', 'sticky_store'), ('xteink_x4_pro', 'x4pro_store'),
+        ('eego_a4', 'eego_a4_store'), ('murphy_m4', 'murphy_m4_store'),
+        ('metalio_eink4', 'metalio_eink4_store'), ('readpico', 'readpico_store')):
+    original = OFFICIAL_TARGETS[target_id]
+    TARGETS[target_id] = {**original, 'environment': environment, 'flashMode': original['flash']['mode'],
+                          'mcu': 'esp32c3' if original['chip'] == 'ESP32-C3' else 'esp32s3'}
+TARGETS.update({
+    'xteink_x4_classic': {'deviceSlug': 'x4c', 'models': ['xteink_x4_classic'], 'boardTag': 'x4c',
+                        'chip': 'ESP32-S3', 'chipId': 9, 'environment': 'x4c_store', 'flashMode': 'dio'},
+    'lilygo_t5s3': {'deviceSlug': 'lilygo-t5s3', 'models': ['lilygo_t5s3'], 'boardTag': 'lilygo',
+                   'chip': 'ESP32-S3', 'chipId': 9, 'environment': 'lilygo_t5s3_store', 'flashMode': 'dio'},
+})
+USER_TESTED_TARGETS = {'m5stack_paper_mono', 'm5stack_papers3', 'waveshare_epaper_397'}
+
+
 def install_segments(target):
     return tuple((role, name, target.get('bootloaderOffset', 0) if role == 'bootloader' else offset)
                  for role, name, offset in FULL_INSTALL_SEGMENTS)
@@ -234,6 +252,7 @@ def package(root, target_id, expected_sha, output):
     manifest = {'schemaVersion': 1, 'releaseKind': KIND, 'targetId': target_id,
                 'models': target['models'], 'deviceSlug': slug, 'boardTag': target['boardTag'],
                 'chip': target['chip'], 'environment': target['environment'], 'appStore': True,
+                'validationStatus': 'prior-hardware-record' if target_id in USER_TESTED_TARGETS else 'alpha-unverified',
                 'version': version, 'crossmuxSha': expected_sha, 'sdkSha': sdk_sha,
                 'partitionProfile': 'crossmux-sticky-v1',
                 'flash': {'size': FLASH_SIZE, 'mode': target['flashMode'], 'frequency': target.get('flashFrequency', '80m')}, 'assets': assets}
@@ -258,6 +277,7 @@ def verify_set(folder, expected_sha, sdk_sha, aggregated=False):
         for key, value in {'schemaVersion': 1, 'releaseKind': KIND, 'targetId': target_id,
                            'deviceSlug': slug, 'models': target['models'], 'boardTag': target['boardTag'],
                            'chip': target['chip'], 'environment': target['environment'], 'appStore': True,
+                'validationStatus': 'prior-hardware-record' if target_id in USER_TESTED_TARGETS else 'alpha-unverified',
                            'crossmuxSha': expected_sha, 'sdkSha': sdk_sha,
                            'partitionProfile': 'crossmux-sticky-v1',
                            'flash': {'size': FLASH_SIZE, 'mode': target['flashMode'], 'frequency': target.get('flashFrequency', '80m')}}.items():
