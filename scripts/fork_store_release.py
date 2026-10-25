@@ -9,7 +9,9 @@ import shutil
 import struct
 from pathlib import Path
 
+from git_branch import get_git_branch, get_git_short_sha
 from nightly_targets import TARGETS as OFFICIAL_TARGETS
+from nightly_targets import version_for
 from package_nightly_target import (
     EXPECTED_PARTITIONS, FULL_INSTALL_SEGMENTS, find_boot_app0, git_value,
     sha256, verify_firmware, verify_partition_csv,
@@ -82,15 +84,23 @@ def target_version(root, target):
     flags = option(config, section, 'build_flags').split()
     require([f for f in flags if f.startswith('-DCROSSMUX_STORE=')] == ['-DCROSSMUX_STORE=1'],
             'release target must explicitly enable CrossStore once')
-    versions = [f.split('=', 1)[1].replace('\\', '').strip('"')
-                for f in flags if f.startswith('-DCROSSPOINT_VERSION=')]
-    require(len(versions) == 1 and bool(re.fullmatch(r'[A-Za-z0-9.+_-]{1,95}', versions[0])),
-            'release target must set one explicit safe CROSSPOINT_VERSION')
+    require(not any(f.startswith('-DCROSSPOINT_VERSION') for f in flags),
+            'release target must use the shared version middleware, without an explicit override')
+    mode = option(config, section, 'custom_build_mode')
+    require(mode in ('dev', 'stable', 'nightly'), 'unsupported build mode')
+    version = version_for(config.get('crosspoint', 'version'), None, mode, 'global', get_git_short_sha(root),
+                          get_git_branch(root) if mode == 'dev' else 'unknown')
+    require(valid_version(version), 'release target must generate a safe firmware version')
     require(option(config, section, 'board_build.partitions') == 'partitions.csv', 'unsupported partition CSV')
     require(option(config, section, 'board_build.flash_size') == '16MB', 'expected 16 MB flash')
     require(option(config, section, 'board_build.flash_mode') == target['flashMode'], 'wrong configured flash mode')
     require(option(config, section, 'board_build.mcu') == 'esp32s3', 'expected ESP32-S3')
-    return versions[0]
+    return version
+
+
+def valid_version(version):
+    # Branch slashes are metadata only; asset paths always use fixed device slugs.
+    return isinstance(version, str) and bool(re.fullmatch(r'[A-Za-z0-9.+_/-]{1,95}', version))
 
 
 def preflight(root, expected_sha):
@@ -243,7 +253,7 @@ def verify_set(folder, expected_sha, sdk_sha, aggregated=False):
                            'partitionProfile': 'crossmux-sticky-v1',
                            'flash': {'size': FLASH_SIZE, 'mode': target['flashMode'], 'frequency': '80m'}}.items():
             require(manifest.get(key) == value, f'{name}: wrong {key}')
-        require(bool(re.fullmatch(r'[A-Za-z0-9.+_-]{1,95}', manifest['version'])), 'invalid version')
+        require(valid_version(manifest.get('version')), 'invalid version')
         verify_images(folder, target, manifest['assets'], manifest['version'])
         asset_names = [a['name'] for a in manifest['assets']] + [name]
         checksum_name = f'{slug}-SHA256SUMS'

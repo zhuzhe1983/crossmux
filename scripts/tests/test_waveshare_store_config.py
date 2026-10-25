@@ -67,12 +67,12 @@ class WaveshareStoreConfigTest(unittest.TestCase):
             self.assertIn(asset, self.option(TARGET, "board_build.embed_files").split())
             self.assertTrue((ROOT / asset).is_file())
 
-    def test_version_is_explicit_and_not_dependent_on_git_branch_hook(self):
+    def test_version_uses_shared_development_mode_and_hook(self):
         versions = [flag for flag in self.option(TARGET, "build_flags").split()
                     if flag.startswith("-DCROSSPOINT_VERSION=")]
-        self.assertEqual(versions, [
-            '-DCROSSPOINT_VERSION=\\"' + self.config["crosspoint"]["version"] + '-waveshare-epaper-397\\"'
-        ])
+        self.assertEqual(versions, [])
+        self.assertEqual(self.option(TARGET, "custom_build_mode"), "dev")
+        self.assertEqual(self.option(TARGET, "extra_scripts").split().count("pre:scripts/git_branch.py"), 1)
 
     def test_flash_offsets_match_the_existing_16_mib_update_contract(self):
         self.assertEqual(self.option(TARGET, "board_build.flash_size"), "16MB")

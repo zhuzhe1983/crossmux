@@ -17,6 +17,7 @@ import nightly_targets
 
 SHA = 'a' * 40
 SDK_SHA = 'b' * 40
+VERSION = '1.6.5-dev-codex/crossstore-apps-' + SHA[:7]
 
 
 def image(board=None, version=None, chip=9):
@@ -48,18 +49,21 @@ class ForkStoreReleaseTest(unittest.TestCase):
         self.root = Path(self.temporary.name)
         self.sdk = self.root / 'freeink-sdk'
         self.sdk.mkdir()
+        for name, value in (('get_git_short_sha', SHA[:7]), ('get_git_branch', 'codex/crossstore-apps')):
+            patcher = mock.patch.object(release, name, return_value=value)
+            patcher.start()
+            self.addCleanup(patcher.stop)
         shutil.copyfile(ROOT / 'partitions.csv', self.root / 'partitions.csv')
         config = ('[crosspoint]\nversion=1.6.5\n[base]\nboard_build.partitions=partitions.csv\n'
                   'board_build.flash_size=16MB\nboard_build.flash_mode=dio\nboard_build.mcu=esp32s3\n'
-                  'build_flags=-DCROSSMUX_STORE=1\n')
+                  'custom_build_mode=dev\nbuild_flags=-DCROSSMUX_STORE=1\n')
         for target in release.TARGETS.values():
             config += (f"[env:{target['environment']}]\nextends=base\n"
                        f"board_build.flash_mode={target['flashMode']}\nbuild_flags=\n"
-                       ' ${base.build_flags}\n'
-                       f" -DCROSSPOINT_VERSION=\\\"${{crosspoint.version}}-{target['deviceSlug']}\\\"\n")
+                       ' ${base.build_flags}\n')
             build = self.root / '.pio/build' / target['environment']
             build.mkdir(parents=True)
-            (build / 'firmware.bin').write_bytes(image(target['boardTag'], '1.6.5-' + target['deviceSlug']))
+            (build / 'firmware.bin').write_bytes(image(target['boardTag'], VERSION))
             (build / 'bootloader.bin').write_bytes(image())
             (build / 'partitions.bin').write_bytes(partitions())
         (self.root / 'platformio.ini').write_text(config)
@@ -93,7 +97,8 @@ class ForkStoreReleaseTest(unittest.TestCase):
         self.assertEqual([v['environment'] for v in release.matrix()['include']],
                          ['papermono_store', 'papers3_store', 'waveshare_epaper_397_store'])
         self.assertNotIn('m5stack_papers3', nightly_targets.TARGETS)
-        self.assertEqual(set(nightly_targets.targets_for('stable')), {'xteink_x4', 'sticky'})
+        self.assertEqual(set(nightly_targets.targets_for('stable')), set(nightly_targets.targets_for('nightly')))
+        self.assertEqual(len(nightly_targets.targets_for('stable')), 9)
         self.assertEqual(release.TARGETS['m5stack_papers3']['models'], ['m5paper_s3'])
         config = configparser.ConfigParser(interpolation=None)
         config.read(ROOT / 'platformio.ini')
@@ -140,16 +145,33 @@ class ForkStoreReleaseTest(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     release.validate_trigger(event, bad_ref, bad_sha, bad_payload)
 
-    def test_store_flag_and_explicit_version_required(self):
+    def test_store_flag_and_shared_version_required(self):
         config = self.root / 'platformio.ini'
         original = config.read_text()
         for before, after in (('CROSSMUX_STORE=1', 'CROSSMUX_STORE=0'),
-                              ('CROSSPOINT_VERSION', 'OTHER_VERSION'),
+                              ('custom_build_mode=dev', 'custom_build_mode=invalid'),
+                              ('-DCROSSMUX_STORE=1', '-DCROSSMUX_STORE=1 -DCROSSPOINT_VERSION=legacy'),
                               ('16MB', '8MB'), ('esp32s3', 'esp32c3')):
             config.write_text(original.replace(before, after))
             with self.assertRaises(ValueError):
                 release.target_version(self.root, next(iter(release.TARGETS.values())))
         config.write_text(original)
+
+    def test_generated_versions_match_modes_and_allow_branch_metadata_only(self):
+        config = self.root / 'platformio.ini'
+        original = config.read_text()
+        target = next(iter(release.TARGETS.values()))
+        for mode, expected in (('dev', VERSION), ('stable', '1.6.5'), ('nightly', '1.6.5-rc+' + SHA[:7])):
+            with self.subTest(mode=mode):
+                config.write_text(original.replace('custom_build_mode=dev', 'custom_build_mode=' + mode))
+                self.assertEqual(release.target_version(self.root, target), expected)
+        config.write_text(original)
+        with mock.patch.object(release, 'get_git_branch', return_value='detached'):
+            self.assertEqual(release.target_version(self.root, target), '1.6.5-dev-detached-' + SHA[:7])
+        for branch in ('unsafe"branch', 'unsafe\\branch', 'unsafe\nbranch', 'a' * 96):
+            with self.subTest(branch=branch), mock.patch.object(release, 'get_git_branch', return_value=branch):
+                with self.assertRaisesRegex(ValueError, 'safe firmware version'):
+                    release.target_version(self.root, target)
 
     def test_fresh_checkout_has_all_store_hooks_local_libraries_and_icon_inputs(self):
         config = configparser.ConfigParser(interpolation=None, inline_comment_prefixes=(';',))
@@ -206,10 +228,10 @@ class ForkStoreReleaseTest(unittest.TestCase):
         (output / 'old.bin').write_bytes(b'old')
         with self.assertRaises(ValueError): self.package(key, output)
         firmware = self.root / '.pio/build/papermono_store/firmware.bin'
-        for number, raw in enumerate((image('papers3', '1.6.5-papermono'),
-                                     image('papermono', '1.6.5-papermono', chip=5),
+        for number, raw in enumerate((image('papers3', VERSION),
+                                     image('papermono', VERSION, chip=5),
                                      image('papermono', 'wrong-version'),
-                                     image('papermono', '1.6.5-papermono') + b'x' * 0x640000)):
+                                     image('papermono', VERSION) + b'x' * 0x640000)):
             firmware.write_bytes(raw)
             with self.assertRaises((ValueError, SystemExit)):
                 self.package(key, self.root / f'invalid-{number}')
