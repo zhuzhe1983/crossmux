@@ -26,6 +26,7 @@ cmake --build build/test
 ctest --test-dir build/test --output-on-failure -j
 python3 freeink-sdk/libs/display/EpdiyLcd/test/host/test_transactions.py
 python3 test/test_papers3_port.py
+python3 test/test_m5paper_v11_port.py
 python3 test/test_hal_power_sources.py
 
 echo "Local CI checks passed."

@@ -38,6 +38,8 @@ All nine targets are configured for both channels. Availability depends on a suc
 
 [M5Stack PaperS3](./docs/engineering/papers3.md) has an experimental development target (`pio run -e papers3`), separate from Paper Mono. Basic display, touch, EPUB reading and two sleep/recovery cycles passed on v1.0; extended acceptance remains pending. Native 16-level grayscale and semantic app icons have also passed physical checks. It is not published in Nightly/OTA indexes.
 
+[M5Paper v1.1](./docs/engineering/m5paper-v11.md) adds experimental classic ESP32 builds (`m5paper_v11` / `m5paper_v11_store`), with native 16-gray images, RTC and Lua apps. No physical validation yet; no USB disk or Tox support is advertised. The fork release and web flasher label this model experimental.
+
 Use [Stable](https://github.com/0x1abin/crossmux/releases/tag/stable) for formal releases, or [Nightly](https://github.com/0x1abin/crossmux/releases/tag/nightly) for development builds. Both channels use the same target and package rules. The [target table](./scripts/nightly_targets.py) defines channels and artifact names; [release architecture](./docs/engineering/firmware-release.md) explains packaging and OTA. Current source version and build environments live in [platformio.ini](./platformio.ini).
 
 ## Install firmware
@@ -83,7 +85,7 @@ pio run -e gh_release
 pio run -e gh_release -t upload
 ```
 
-The application binary is `.pio/build/<environment>/firmware.bin`. This fork has 41 build entries: the 35 upstream entries (Dev, Stable and Nightly for nine release targets, two development-only boards and six simulators), plus PaperS3, two chat profiles and three Store profiles. Versions and Git hashes are generated automatically: Stable `<base>`, Nightly `<base>-rc+<sha7>`, Dev `<base>-dev-<branch>-<sha7>`. For other boards, see [build-system.md](./docs/engineering/build-system.md).
+The application binary is `.pio/build/<environment>/firmware.bin`. This fork has 43 build entries: the 35 upstream entries (Dev, Stable and Nightly for nine release targets, two development-only boards and six simulators), plus PaperS3 and M5Paper v1.1, two chat profiles and four Store profiles. Versions and Git hashes are generated automatically: Stable `<base>`, Nightly `<base>-rc+<sha7>`, Dev `<base>-dev-<branch>-<sha7>`. For other boards, see [build-system.md](./docs/engineering/build-system.md).
 
 For X4 Pro and Metalio E-Ink 4:
 

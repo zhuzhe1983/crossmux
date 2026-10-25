@@ -8,7 +8,9 @@
 #include "Arduino.h"
 #include "HalStorage.h"
 #include "Logging.h"
+#if SOC_TEMP_SENSOR_SUPPORTED
 #include "driver/temperature_sensor.h"
+#endif
 #include "esp_debug_helpers.h"
 #include "esp_mac.h"
 #include "esp_memory_utils.h"
@@ -172,6 +174,7 @@ bool getWifiStationMac(DeviceId& out) {
 
 bool getChipTemperatureCelsius(float& out) {
   out = 0.0f;
+#if SOC_TEMP_SENSOR_SUPPORTED
   temperature_sensor_handle_t sensor = nullptr;
   const temperature_sensor_config_t config = TEMPERATURE_SENSOR_CONFIG_DEFAULT(-10, 80);
 
@@ -199,6 +202,10 @@ bool getChipTemperatureCelsius(float& out) {
   if (!uninstallOk) LOG_ERR("SYS", "Failed to uninstall chip temperature sensor");
 
   return readOk && disableOk && uninstallOk;
+#else
+  // Classic ESP32 has no driver for this API; report unavailable to callers.
+  return false;
+#endif
 }
 
 uint64_t getUptimeSeconds() { return static_cast<uint64_t>(esp_timer_get_time()) / 1000000ULL; }

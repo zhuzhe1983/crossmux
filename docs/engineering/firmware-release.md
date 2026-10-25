@@ -193,11 +193,11 @@ CI, indexes, and checksum checks do not replace real-device acceptance. Before
 making a Nightly pipeline production-critical, test OTA and reboot on every S3
 target, one X3/X4, both content profiles, and one wrong-board negative case.
 
-## Personal CrossStore three-device prereleases
+## Personal CrossStore four-device prereleases
 
 The separate workflow
 [`fork-store-release.yml`](../../.github/workflows/fork-store-release.yml), named
-**CrossStore Three-Device Release**, targets `zhuzhe1983/crossmux`. It builds on
+**CrossStore Four-Device Release**, targets `zhuzhe1983/crossmux`. It builds on
 GitHub-hosted Ubuntu runners and needs no COS or self-hosted runner secrets.
 It does not modify the official target table, supported Stable devices,
 `stable`/`nightly` tags, rolling OTA indexes, or retention policy above.
@@ -208,19 +208,23 @@ It does not modify the official target table, supported Stable devices,
 | M5Stack PaperS3 | `papers3_store` | `papers3` | `papers3-` |
 | Waveshare ESP32-S3-ePaper-3.97 | `waveshare_epaper_397_store` | `waveshare_epaper_397` | `waveshare-epaper-397-` |
 
-All three are ESP32-S3 / 16 MiB Store builds with the current `partitions.csv`
+| M5Paper v1.1 (experimental, untested) | `m5paper_v11_store` | `m5paper` | `m5paper-v11-` |
+
+The first three are ESP32-S3; M5Paper v1.1 is classic ESP32. All use 16 MiB Flash
+and the current `partitions.csv`
 layout. PaperS3's SDK runtime model is `m5paper_s3`; it has its own binary,
 not the PaperMono image. This matrix is independent of the official Nightly
 matrix because its environments include `CROSSMUX_STORE=1` and the optional
 services selected by each board's Store profile. PaperS3's configured upload
 mode is QIO; Mono and Waveshare use DIO. The manifest records that difference;
-the packager preserves each built bootloader header and does not rewrite it.
+M5Paper uses QIO/40 MHz and the S3 builds use 80 MHz.
+The packager preserves each built bootloader header and does not rewrite it.
 
 Run the workflow on the intended committed branch or tag. GitHub dispatch
 resolves that ref to `GITHUB_SHA`; every checkout explicitly uses that immutable
 SHA. `publish_release=false` builds and retains Actions artifacts for 14 days
 without creating a GitHub Release. The default `true` publishes only after all
-three matrix jobs succeed. The workflow must first be available on the fork's
+four matrix jobs succeed. The workflow must first be available on the fork's
 default branch for GitHub's normal manual-dispatch entry point; choosing another
 ref must select a revision containing this workflow and its scripts.
 See [GitHub's dispatch contract](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#workflow_dispatch).
@@ -245,7 +249,7 @@ tag event. Do not move or force-push a build tag; use Actions' **Re-run all jobs
 for the same commit, or create a new source-bound tag for a new commit. Artifact
 names include the run attempt, so rerunning only failed jobs cannot combine
 earlier successful build assets with the new attempt. A build-tag run
-always requests publication, but still requires all three successful builds
+always requests publication, but still requires all four successful builds
 and both local and downloaded-asset verification. Output release tags use
 `crossstore-...`, which does not match the `crossstore-build-*` input pattern.
 This also keeps them outside the official workflow's stable version tags.
@@ -307,12 +311,14 @@ For each target the packager emits seven files: `*-firmware.bin`,
 `*-full-install.bin`, `*-install-manifest.json`, and `*-SHA256SUMS`.
 The manifest records exact CrossMux/SDK SHAs, board/model/environment, configured
 version, flash profile, and each image's role, offset, length and SHA-256.
-The combined `crossstore-release.json` is an inventory of these three manifests;
+The combined `crossstore-release.json` is an inventory of these four manifests;
 it is deliberately not an official OTA index or an ESP Web Tools manifest.
 
 `firmware.bin` is the application image for the corresponding device's existing
 compatible CrossMux installation. Full installation uses segments at `0x0`,
 `0x8000`, `0xE000`, and `0x10000`, or the merged `full-install.bin` at `0x0`.
+For M5Paper only, the separate bootloader starts at **0x1000**, not 0x0. Its
+merged image still starts at 0x0 with an erased 0x1000 prefix.
 The merged image pads gaps with `0xFF`, including the NVS region, so it replaces
 bootloader/partition/NVS/OTA state. Back up Flash first and use the application
 image for routine updates. The images do not include TF-card contents or Lua
@@ -320,8 +326,8 @@ application data. Partition changes require a separate migration decision.
 
 The packager reuses the official chip/board-tag and CSV layout checks, then
 also verifies the emitted partition binary (including its MD5, types, offsets,
-overlaps and bounds), S3 bootloader, app-slot limit, and byte-for-byte merged
-segments. Aggregation requires exactly all three targets, the dispatched
+overlaps and bounds), chip-specific bootloader, app-slot limit, and byte-for-byte merged
+segments. Aggregation requires exactly all four targets, the dispatched
 CrossMux SHA and one SDK SHA, correct sizes/hashes, and an exact filename
 allowlist. Extra files, symlinks, stale output directories and missing targets
 fail the job rather than being uploaded.

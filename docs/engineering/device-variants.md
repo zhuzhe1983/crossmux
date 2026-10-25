@@ -11,6 +11,9 @@
 > on both the Xteink X3 and X4, how the device is detected at boot, what differs
 > between the two panels, and how to build / flash / verify for X3.
 
+[M5Paper v1.1](m5paper-v11.md) adds separate classic ESP32 development and Store
+targets. It is experimental and has not been physically validated.
+
 ## TL;DR
 
 **There is no X3 build. There is no X4 build. There is one build that is both.**

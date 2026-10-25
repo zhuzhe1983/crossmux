@@ -20,10 +20,10 @@ SDK_SHA = 'b' * 40
 VERSION = '1.6.5-dev-codex/crossstore-apps-' + SHA[:7]
 
 
-def image(board=None, version=None, chip=9):
+def image(board=None, version=None, chip=9, frequency=0x4f):
     raw = bytearray(256)
     raw[0] = 0xE9
-    raw[2:4] = b'\x02\x4f'
+    raw[2:4] = bytes((2, frequency))
     raw[12:14] = chip.to_bytes(2, 'little')
     if board:
         raw.extend(f'CROSSPOINT-BOARD-V1:{board};'.encode())
@@ -59,12 +59,13 @@ class ForkStoreReleaseTest(unittest.TestCase):
                   'custom_build_mode=dev\nbuild_flags=-DCROSSMUX_STORE=1\n')
         for target in release.TARGETS.values():
             config += (f"[env:{target['environment']}]\nextends=base\n"
-                       f"board_build.flash_mode={target['flashMode']}\nbuild_flags=\n"
+                       f"board_build.flash_mode={target['flashMode']}\n"
+                       f"board_build.mcu={target.get('mcu', 'esp32s3')}\nbuild_flags=\n"
                        ' ${base.build_flags}\n')
             build = self.root / '.pio/build' / target['environment']
             build.mkdir(parents=True)
-            (build / 'firmware.bin').write_bytes(image(target['boardTag'], VERSION))
-            (build / 'bootloader.bin').write_bytes(image())
+            (build / 'firmware.bin').write_bytes(image(target['boardTag'], VERSION, chip=target['chipId']))
+            (build / 'bootloader.bin').write_bytes(image(chip=target['chipId'], frequency=0x40 if target.get('flashFrequency') == '40m' else 0x4f))
             (build / 'partitions.bin').write_bytes(partitions())
         (self.root / 'platformio.ini').write_text(config)
         self.boot_app0 = self.root / '.pio/boot_app0.bin'
@@ -93,9 +94,9 @@ class ForkStoreReleaseTest(unittest.TestCase):
                 shutil.copyfile(path, output / path.name)
         return output
 
-    def test_fixed_three_store_targets_preserve_official_channels(self):
+    def test_fixed_four_store_targets_preserve_official_channels(self):
         self.assertEqual([v['environment'] for v in release.matrix()['include']],
-                         ['papermono_store', 'papers3_store', 'waveshare_epaper_397_store'])
+                         ['papermono_store', 'papers3_store', 'waveshare_epaper_397_store', 'm5paper_v11_store'])
         self.assertNotIn('m5stack_papers3', nightly_targets.TARGETS)
         self.assertEqual(set(nightly_targets.targets_for('stable')), set(nightly_targets.targets_for('nightly')))
         self.assertEqual(len(nightly_targets.targets_for('stable')), 9)
@@ -179,8 +180,11 @@ class ForkStoreReleaseTest(unittest.TestCase):
         for target in release.TARGETS.values():
             section = 'env:' + target['environment']
             hooks = release.option(config, section, 'extra_scripts').split()
-            self.assertIn('pre:scripts/configure_chat.py', hooks)
-            self.assertIn('post:scripts/build_chat.py', hooks)
+            if target['chip'] == 'ESP32-S3':
+                self.assertIn('pre:scripts/configure_chat.py', hooks)
+                self.assertIn('post:scripts/build_chat.py', hooks)
+            else:
+                self.assertNotIn('post:scripts/build_chat.py', hooks)
             self.assertIn('pre:scripts/generate_store_icon.py', hooks)
             self.assertIn('pre:scripts/generate_woodfish_audio.py', hooks)
             for hook in hooks:
@@ -211,8 +215,8 @@ class ForkStoreReleaseTest(unittest.TestCase):
     def test_complete_package_offsets_checksums_and_merged_bytes(self):
         output = self.complete()
         summary = release.verify_set(output, SHA, SDK_SHA)
-        self.assertEqual(len(summary['targets']), 3)
-        self.assertEqual(len(list(output.iterdir())), 21)
+        self.assertEqual(len(summary['targets']), 4)
+        self.assertEqual(len(list(output.iterdir())), 28)
         release.json_write(output / 'crossstore-release.json', summary)
         self.assertEqual(release.verify_set(output, SHA, SDK_SHA, aggregated=True), summary)
         for target in release.TARGETS.values():
@@ -220,6 +224,30 @@ class ForkStoreReleaseTest(unittest.TestCase):
             full = (output / f'{slug}-full-install.bin').read_bytes()
             self.assertEqual(full[0x10000:], (output / f'{slug}-firmware.bin').read_bytes())
             self.assertEqual(full[0x9000:0xe000], b'\xff' * 0x5000)
+
+    def test_classic_esp32_offset_chip_frequency_and_erased_prefix(self):
+        output = self.complete()
+        manifest_path = output / 'm5paper-v11-install-manifest.json'
+        manifest = json.loads(manifest_path.read_text())
+        self.assertEqual(manifest['chip'], 'ESP32')
+        self.assertEqual(manifest['flash']['frequency'], '40m')
+        self.assertEqual(manifest['assets'][0]['offset'], 0x1000)
+        full = (output / 'm5paper-v11-full-install.bin').read_bytes()
+        self.assertEqual(full[:0x1000], b'\xff' * 0x1000)
+        self.assertEqual(full[0x1000:0x1100], (output / 'm5paper-v11-bootloader.bin').read_bytes())
+        for field, value in (('chip', 'ESP32-S3'), ('flash', {**manifest['flash'], 'frequency': '80m'})):
+            release.json_write(manifest_path, {**manifest, field: value})
+            with self.assertRaisesRegex(ValueError, 'wrong ' + field):
+                release.verify_set(output, SHA, SDK_SHA)
+        manifest['assets'][0]['offset'] = 0
+        release.json_write(manifest_path, manifest)
+        with self.assertRaisesRegex(ValueError, 'name/offset'):
+            release.verify_set(output, SHA, SDK_SHA)
+        boot = self.root / '.pio/build/m5paper_v11_store/bootloader.bin'
+        for n, raw in enumerate((image(chip=9, frequency=0x40), image(chip=0, frequency=0x4f))):
+            boot.write_bytes(raw)
+            with self.assertRaises(ValueError):
+                self.package('m5stack_m5paper_v11', self.root / f'wrong-classic-boot-{n}')
 
     def test_reject_stale_output_symlink_wrong_chip_board_and_slot_overflow(self):
         key = 'm5stack_paper_mono'

@@ -26,6 +26,7 @@ class ControlCenterGestureTest(unittest.TestCase):
 struct RenderLock {};
 unsigned long millis() { return 0; }
 namespace systemMessages {
+  inline unsigned unread() { return 0; }
   inline unsigned revision() { return 0; }
   inline bool hit(int, int) { return false; }
   inline void clearHit() {}

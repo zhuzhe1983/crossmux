@@ -1,4 +1,4 @@
-name: CrossStore Three-Device Release
+name: CrossStore Four-Device Release
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       publish_release:
-        description: 'Publish a prerelease after all three builds and asset checks pass'
+        description: 'Publish a prerelease after all four builds and asset checks pass'
         required: true
         default: true
         type: boolean
@@ -16,7 +16,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: crossstore-three-device-release
+  group: crossstore-four-device-release
   cancel-in-progress: false
 
 jobs:
@@ -45,6 +45,10 @@ jobs:
         run: python3 scripts/fork_store_release.py preflight --sha "$GITHUB_SHA" --output "$GITHUB_OUTPUT"
       - name: Test release packaging and rejection paths
         run: python3 -m unittest discover -s scripts/tests -p test_fork_store_release.py
+      - name: Check M5Paper native grayscale and PaperS3 touch recovery
+        run: |
+          python3 test/test_m5paper_v11_port.py
+          python3 test/test_papers3_port.py
       - name: Check SDK display transactions with the Linux linker
         run: python3 freeink-sdk/libs/display/EpdiyLcd/test/host/test_transactions.py
 
@@ -114,7 +118,7 @@ jobs:
           pattern: fork-store-${{ github.run_id }}-${{ github.run_attempt }}-*
           path: artifacts
           merge-multiple: true
-      - name: Require all three matching manifests and exact asset allowlist
+      - name: Require all four matching manifests and exact asset allowlist
         run: |
           python3 scripts/fork_store_release.py assemble --input artifacts --output publish \
             --sha "$GITHUB_SHA" --sdk-sha "$SDK_SHA"
@@ -126,7 +130,7 @@ jobs:
           import json, os
           from pathlib import Path
           lines = ['# CrossMux with AppStore', '',
-                   'Experimental PaperMono / PaperS3 / Waveshare ESP32-S3-ePaper-3.97 builds.', '',
+                   'Experimental PaperMono / PaperS3 / Waveshare ESP32-S3-ePaper-3.97 / M5Paper v1.1 builds.', '',
                    'Source: `' + os.environ['GITHUB_SHA'] + '`',
                    'SDK: `' + os.environ['SDK_SHA'] + '`', '',
                    '| Device | Environment | Version |', '| --- | --- | --- |']
@@ -142,7 +146,10 @@ jobs:
                     'Waveshare AirTune speaker output works and was reported clean, but remains too quiet at 100%; loudness is not resolved.',
                     'Waveshare paired chat, sustained USB transfers and sleep cycles still need device testing.',
                     'PaperMono buzzer playback remains quiet in listening tests; this release does not claim to resolve its loudness.',
-                    'PaperS3 has earlier store acceptance; the latest build still needs renewed device testing.', '',
+                    'PaperS3 includes stale-touch recovery and avoids notification render-lock waits when the inbox is empty; renewed touch acceptance is pending.',
+                    'M5Paper v1.1 is a new ESP32 experimental port: build/host tests only, NO physical validation. Display, touch, SD, RTC and sleep must still be tested.',
+                    'M5Paper has native 16-gray icons, Lua apps and ESP-NOW; no Tox wifi_chat, USB disk, speaker/microphone or LoRa support is advertised.',
+                    'M5Paper full images include an erased 0x1000 prefix: flash the merged image at 0x0, or the separate bootloader at 0x1000 (S3 bootloaders start at 0x0).', '',
                     'The app store is experimental: the preview downloader skips HTTPS certificate verification and packages are not publisher-signed.',
                     'Architecture and limitations: https://github.com/0x1abin/crossmux/issues/433', '']
           Path('release-body.md').write_text('\n'.join(lines))

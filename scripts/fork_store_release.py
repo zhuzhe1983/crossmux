@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build/verify an isolated three-device CrossStore release, never an OTA index."""
+"""Build/verify an isolated device-specific CrossStore release, never an OTA index."""
 import argparse
 import configparser
 import hashlib
@@ -26,7 +26,15 @@ TARGETS = {
                       'chip': 'ESP32-S3', 'chipId': 9, 'environment': 'papers3_store', 'flashMode': 'qio'},
     'waveshare_epaper_397': {**OFFICIAL_TARGETS['waveshare_epaper_397'],
                            'environment': 'waveshare_epaper_397_store', 'flashMode': 'dio'},
+    'm5stack_m5paper_v11': {'deviceSlug': 'm5paper-v11', 'models': ['m5paper_v11'], 'boardTag': 'm5paper',
+                          'chip': 'ESP32', 'chipId': 0, 'environment': 'm5paper_v11_store', 'flashMode': 'qio',
+                          'mcu': 'esp32', 'bootloaderOffset': 0x1000, 'flashFrequency': '40m'},
 }
+
+
+def install_segments(target):
+    return tuple((role, name, target.get('bootloaderOffset', 0) if role == 'bootloader' else offset)
+                 for role, name, offset in FULL_INSTALL_SEGMENTS)
 
 
 def require(condition, message):
@@ -94,7 +102,7 @@ def target_version(root, target):
     require(option(config, section, 'board_build.partitions') == 'partitions.csv', 'unsupported partition CSV')
     require(option(config, section, 'board_build.flash_size') == '16MB', 'expected 16 MB flash')
     require(option(config, section, 'board_build.flash_mode') == target['flashMode'], 'wrong configured flash mode')
-    require(option(config, section, 'board_build.mcu') == 'esp32s3', 'expected ESP32-S3')
+    require(option(config, section, 'board_build.mcu') == target.get('mcu', 'esp32s3'), 'wrong configured MCU')
     return version
 
 
@@ -157,7 +165,7 @@ def verify_images(folder, target, assets, version):
     expected_roles = {role for role, _, _ in FULL_INSTALL_SEGMENTS} | {'full_install'}
     require(set(by_role) == expected_roles and len(assets) == len(expected_roles), 'missing/duplicate image role')
     slug = target['deviceSlug']
-    for role, filename, offset in (*FULL_INSTALL_SEGMENTS, ('full_install', 'full-install.bin', 0)):
+    for role, filename, offset in (*install_segments(target), ('full_install', 'full-install.bin', 0)):
         item = by_role[role]
         require(item['name'] == f'{slug}-{filename}' and item['offset'] == offset, 'wrong asset name/offset')
         path = folder / item['name']
@@ -166,11 +174,12 @@ def verify_images(folder, target, assets, version):
                 'wrong image size')
         require(sha256(path) == item['sha256'], 'image SHA-256 mismatch')
     boot = (folder / by_role['bootloader']['name']).read_bytes()
-    require(24 <= len(boot) <= 0x8000 and boot[0] == 0xE9 and int.from_bytes(boot[12:14], 'little') == 9,
-            'wrong S3 bootloader')
+    require(24 <= len(boot) <= 0x8000 - target.get('bootloaderOffset', 0) and boot[0] == 0xE9
+            and int.from_bytes(boot[12:14], 'little') == target['chipId'], 'wrong bootloader chip/size')
     # ESP bootloaders can begin in DIO before enabling configured QIO. Preserve
     # the built header; the manifest records the board's upload mode separately.
-    require(boot[2] in (0, 2) and boot[3] == 0x4f, 'bootloader must declare 16 MB / 80 MHz')
+    require(boot[2] in (0, 2) and boot[3] == (0x40 if target.get('flashFrequency') == '40m' else 0x4f),
+            'bootloader flash size/frequency mismatch')
     verify_partition_binary(folder / by_role['partitions']['name'])
     require(by_role['boot_app0']['size'] == 0x2000, 'wrong boot_app0 size')
     firmware = folder / by_role['firmware']['name']
@@ -180,7 +189,7 @@ def verify_images(folder, target, assets, version):
     full = (folder / by_role['full_install']['name']).read_bytes()
     require(len(full) == 0x10000 + firmware.stat().st_size, 'wrong merged image length')
     cursor = 0
-    for role, _, offset in FULL_INSTALL_SEGMENTS:
+    for role, _, offset in install_segments(target):
         data = (folder / by_role[role]['name']).read_bytes()
         require(offset >= cursor and full[cursor:offset] == b'\xff' * (offset - cursor), 'merged gap differs')
         require(full[offset:offset + len(data)] == data, 'merged segment differs')
@@ -206,7 +215,7 @@ def package(root, target_id, expected_sha, output):
     build = root / '.pio/build' / target['environment']
     slug = target['deviceSlug']
     assets = []
-    for role, source_name, offset in FULL_INSTALL_SEGMENTS:
+    for role, source_name, offset in install_segments(target):
         source = find_boot_app0() if role == 'boot_app0' else build / source_name
         regular(source)
         destination = output / f'{slug}-{source_name}'
@@ -227,7 +236,7 @@ def package(root, target_id, expected_sha, output):
                 'chip': target['chip'], 'environment': target['environment'], 'appStore': True,
                 'version': version, 'crossmuxSha': expected_sha, 'sdkSha': sdk_sha,
                 'partitionProfile': 'crossmux-sticky-v1',
-                'flash': {'size': FLASH_SIZE, 'mode': target['flashMode'], 'frequency': '80m'}, 'assets': assets}
+                'flash': {'size': FLASH_SIZE, 'mode': target['flashMode'], 'frequency': target.get('flashFrequency', '80m')}, 'assets': assets}
     manifest_path = output / f'{slug}-install-manifest.json'
     json_write(manifest_path, manifest)
     files = [output / asset['name'] for asset in assets] + [manifest_path]
@@ -248,10 +257,10 @@ def verify_set(folder, expected_sha, sdk_sha, aggregated=False):
         manifest = json.loads(path.read_text())
         for key, value in {'schemaVersion': 1, 'releaseKind': KIND, 'targetId': target_id,
                            'deviceSlug': slug, 'models': target['models'], 'boardTag': target['boardTag'],
-                           'chip': 'ESP32-S3', 'environment': target['environment'], 'appStore': True,
+                           'chip': target['chip'], 'environment': target['environment'], 'appStore': True,
                            'crossmuxSha': expected_sha, 'sdkSha': sdk_sha,
                            'partitionProfile': 'crossmux-sticky-v1',
-                           'flash': {'size': FLASH_SIZE, 'mode': target['flashMode'], 'frequency': '80m'}}.items():
+                           'flash': {'size': FLASH_SIZE, 'mode': target['flashMode'], 'frequency': target.get('flashFrequency', '80m')}}.items():
             require(manifest.get(key) == value, f'{name}: wrong {key}')
         require(valid_version(manifest.get('version')), 'invalid version')
         verify_images(folder, target, manifest['assets'], manifest['version'])

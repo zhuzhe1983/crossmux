@@ -2,13 +2,14 @@
 
 #include <HalMemory.h>
 #include <HalRadio.h>
+#include <HalSystem.h>
 
 #include "ChatBuildConfig.h"
 
 appCapabilities::Device appCapabilities::currentDevice() {
   Device device{false, false};
-#if CROSSMUX_ESP_CHAT && defined(CONFIG_IDF_TARGET_ESP32S3)
-  device.espNow = true;
+#if CROSSMUX_ESP_CHAT
+  device.espNow = HalSystem::supportsWifi();
 #endif
 #if CROSSMUX_LORA_CHAT
   device.radio = HalRadio::supported();

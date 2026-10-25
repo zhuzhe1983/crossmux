@@ -203,6 +203,15 @@ int main() {
                     self.assertFalse(resolve(section, "custom_sdkconfig"))
                     self.assertEqual(resolve(section, "board_build.arduino.memory_type"), "dio_opi")
                     continue
+                if "FREEINK_DEVICE_M5PAPER=1" in flags:
+                    self.assertEqual(resolve(section, "board_build.mcu"), "esp32")
+                    self.assertEqual(resolve(section, "board_build.arduino.memory_type"), "qio_qspi")
+                    self.assertNotIn("FREEINK_CAP_BLE_HID_HOST=1", flags)
+                    self.assertNotIn("NimBLE-Arduino", libraries)
+                    self.assertNotIn("patch_ble_keyboard_host.py", scripts)
+                    self.assertNotIn("CROSSPOINT_BLE_HOST_PSRAM", flags)
+                    self.assertFalse(resolve(section, "custom_sdkconfig"))
+                    continue
                 self.assertIn("-DFREEINK_CAP_BLE_HID_HOST=1", flags)
                 self.assertIn("h2zero/NimBLE-Arduino @ 2.3.8", libraries)
                 self.assertIn("patch_ble_keyboard_host.py", scripts)
@@ -231,7 +240,7 @@ int main() {
         self.assertEqual(hardware_environments, {
             "default", "gh_release", "gh_release_rc", "x4c", "lilygo_t5s3",
             "papers3", "papermono_chat", "papers3_chat", "papermono_store", "papers3_store",
-            "waveshare_epaper_397_store",
+            "waveshare_epaper_397_store", "m5paper_v11", "m5paper_v11_store",
             *{
                 environment
                 for board in ("sticky", "x4pro", "papermono", "eego_a4", "murphy_m4",

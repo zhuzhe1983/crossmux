@@ -131,6 +131,8 @@ foreach(font_test DifferentialRoundingTest LigatureGuardTest CalculatorFontTest 
 endforeach()
 
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
+add_test(NAME M5PaperV11Port
+  COMMAND ${Python3_EXECUTABLE} ${REPO_ROOT}/test/test_m5paper_v11_port.py)
 add_test(NAME ClippingHighlightPlanes COMMAND ${Python3_EXECUTABLE} ${REPO_ROOT}/test/test_clipping_highlight_planes.py)
 add_test(NAME ClippingSelectionText COMMAND ${Python3_EXECUTABLE} ${REPO_ROOT}/test/test_clipping_selection_text.py)
 add_test(NAME SelectionButtons COMMAND ${Python3_EXECUTABLE} ${REPO_ROOT}/test/test_selection_buttons.py)

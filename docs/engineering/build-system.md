@@ -79,10 +79,11 @@ prebuilt `dio_opi` core continues to supply the TinyUSB CDC/MSC component graph.
   * `simulator_readpico`: Native 1216x684 Read Pico simulator, 684x1216 in portrait
   * `simulator_sticky`: Native Sticky desktop simulator
 
-This fork has 41 environments: the 35 upstream entries (development, Stable and
+This fork has 43 environments: the 35 upstream entries (development, Stable and
 Nightly for nine published targets, development-only `x4c` and `lilygo_t5s3`, and
 six simulators), plus `papers3`, `papermono_chat`, `papers3_chat`,
-`papermono_store`, `papers3_store` and `waveshare_epaper_397_store`. These six
+`papermono_store`, `papers3_store`, `waveshare_epaper_397_store`,
+`m5paper_v11` and `m5paper_v11_store`. These eight
 additional entries inherit development mode and remain outside the official
 Stable/Nightly catalogs. S3 Stable environments use `<board>-gh_release`; Nightly uses
 `<board>_nightly`. `mode_dev`, `mode_stable` and `mode_nightly` supply common

@@ -38,6 +38,8 @@
 
 [M5Stack PaperS3](./docs/engineering/papers3.md) 提供实验性开发构建（`pio run -e papers3`），与 Paper Mono 使用不同固件。v1.0 实机已通过基础显示、触摸、EPUB 阅读和两次休眠恢复测试，其余验收项目仍待完成。原生 16 级灰阶与语义应用图标也已通过实机检查，暂不加入公开 Nightly 与 OTA 索引。
 
+[M5Paper v1.1](./docs/engineering/m5paper-v11.md) 新增老款 ESP32 的实验构建（`m5paper_v11` / `m5paper_v11_store`），包含原生 16 灰阶图片、RTC 和 Lua 应用。尚未实机验证，不提供 USB 磁盘或 Tox；本分支的 Release 与网页刷机入口均标为实验支持。
+
 正式版本使用 [Stable](https://github.com/0x1abin/crossmux/releases/tag/stable)，开发版本使用 [Nightly](https://github.com/0x1abin/crossmux/releases/tag/nightly)，两渠道采用相同目标与打包规则。[目标表](./scripts/nightly_targets.py) 定义渠道与产物名称；[发布架构](./docs/engineering/firmware-release.md) 说明打包与 OTA。当前源码版本及构建环境以 [platformio.ini](./platformio.ini) 为准。
 
 ## 安装固件
@@ -83,7 +85,7 @@ pio run -e gh_release
 pio run -e gh_release -t upload
 ```
 
-应用固件位于 `.pio/build/<环境>/firmware.bin`。本分支共 41 个构建入口：保留官方的 35 个入口（九个发布目标各有 Dev、Stable、Nightly，另有两个仅开发板型和六个模拟器），并增加 PaperS3、两个聊天配置和三个商店配置。版本与 Git 哈希自动生成：Stable 为 `<基础版本>`，Nightly 为 `<基础版本>-rc+<7位SHA>`，Dev 为 `<基础版本>-dev-<分支>-<7位SHA>`。其它板型见[构建文档](./docs/engineering/build-system.md)。
+应用固件位于 `.pio/build/<环境>/firmware.bin`。本分支共 43 个构建入口：保留官方的 35 个入口（九个发布目标各有 Dev、Stable、Nightly，另有两个仅开发板型和六个模拟器），并增加 PaperS3、M5Paper v1.1、两个聊天配置和四个商店配置。版本与 Git 哈希自动生成：Stable 为 `<基础版本>`，Nightly 为 `<基础版本>-rc+<7位SHA>`，Dev 为 `<基础版本>-dev-<分支>-<7位SHA>`。其它板型见[构建文档](./docs/engineering/build-system.md)。
 
 X4 Pro 与 Metalio E-Ink 4 构建命令：
 

@@ -2,6 +2,7 @@
 from pathlib import Path
 import os
 import subprocess
+import sys
 import tempfile
 
 from test_hal_power_sources import function
@@ -108,7 +109,9 @@ int main() {
             "-o", str(tmp / "tag"),
         ], check=True, env=env)
         subprocess.run([str(tmp / "tag")], check=True)
-    print("PaperS3 shutdown ordering/pulses and firmware board guard passed")
+    subprocess.run([sys.executable, str(SDK / "libs/hardware/InputManager/test/host/test_gt911_poll_gap.py")],
+                   check=True)
+    print("PaperS3 shutdown ordering/pulses, firmware board guard and GT911 recovery passed")
 
 
 if __name__ == "__main__":

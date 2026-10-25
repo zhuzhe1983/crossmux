@@ -178,7 +178,9 @@ void ActivityManager::loop() {
       }
       int x = 0, y = 0;
       bool openMessages = false;
-      if (mappedInput.wasScreenTapped(x, y)) {
+      // The unread count is atomic. An empty inbox has no badge to hit, so
+      // ordinary taps must not wait for a full e-paper render just to test it.
+      if (systemMessages::unread() != 0 && mappedInput.wasScreenTapped(x, y)) {
         RenderLock lock;
         openMessages = systemMessages::hit(x, y);
         if (openMessages) systemMessages::clearHit();

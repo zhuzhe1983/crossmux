@@ -30,9 +30,13 @@ def run_cpp(program, include_dirs=(), defines=()):
 // Notification presentation is outside these geometry/reader ownership cases.
 namespace systemMessages {
   template<class... T> void drawBadge(T&&...) {}
-  inline void clearHit() {}
+  inline unsigned unreadCount = 0;
+  inline bool badgeHit = false;
+  inline unsigned hitCalls = 0;
+  inline void clearHit() { badgeHit = false; }
   inline unsigned revision() { return 0; }
-  inline bool hit(int, int) { return false; }
+  inline unsigned unread() { return unreadCount; }
+  inline bool hit(int, int) { ++hitCalls; return badgeHit; }
 }
 #ifdef __clang__
 // Imported SDK C typedef carries C++ field defaults; layout is tested separately.
@@ -858,7 +862,8 @@ unsigned long millis() { return 0; }
 namespace haptic_feedback { inline void touchAction(bool=false) {} }
 struct { void clearTouchTapEvent() {} } gpio;
 struct RenderLock {
-  RenderLock() {}
+  RenderLock() { ++acquisitions; }
+  static inline unsigned acquisitions=0;
   static inline bool busy=false;
   static bool peek() { return busy; }
   void unlock() {}
@@ -912,7 +917,9 @@ std::unique_ptr<Activity> page(const char* theme) {
   p->name=p->tabs?"InxRecent":"Home";
   return p;
 }
-struct SystemMessagesActivity : Activity { SystemMessagesActivity(int,MappedInputManager&) {} };
+struct SystemMessagesActivity : Activity {
+  SystemMessagesActivity(int,MappedInputManager&) { name="SystemMessages"; home=false; }
+};
 struct FrontlightPanelActivity : Activity {
   FrontlightPanelActivity(int,MappedInputManager&) { home=false;name="FrontlightPanel"; }
 };
@@ -977,6 +984,29 @@ void freshBack(ActivityManager& m) {
 }
 int main() {
   using Button=MappedInputManager::Button;
+  {
+    ActivityManager inputDuringRefresh("INX");
+    inputDuringRefresh.tick();
+    const auto previousLocks = RenderLock::acquisitions;
+    const auto previousLoops = inputDuringRefresh.currentActivity->loops;
+    RenderLock::busy=true;
+    inputDuringRefresh.tick({.tap=true,.x=200,.y=300});
+    assert(RenderLock::acquisitions==previousLocks);
+    assert(inputDuringRefresh.currentActivity->loops==previousLoops+1);
+    assert(systemMessages::hitCalls==0);
+    RenderLock::busy=false;
+
+    // A real notification still owns its tap and opens the inbox once.
+    systemMessages::unreadCount=1;
+    systemMessages::badgeHit=true;
+    inputDuringRefresh.tick({.tap=true,.x=200,.y=60});
+    assert(inputDuringRefresh.currentActivity->name=="SystemMessages");
+    assert(inputDuringRefresh.stackActivities.size()==1);
+    assert(systemMessages::hitCalls==1);
+    inputDuringRefresh.tick();
+    assert(inputDuringRefresh.stackActivities.size()==1);
+    systemMessages::unreadCount=0;
+  }
   for(const char* theme:{"INX","Classic","Carousel","Cover Grid"}) {
     ActivityManager stray(theme);
     stray.tick({.released=true});assert(stray.standbyCalls==0);
