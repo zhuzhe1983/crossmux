@@ -207,10 +207,11 @@ It does not modify the official target table, supported Stable devices,
 | M5Stack PaperMono | `papermono_store` | `papermono` | `papermono-` |
 | M5Stack PaperS3 | `papers3_store` | `papers3` | `papers3-` |
 | Waveshare ESP32-S3-ePaper-3.97 | `waveshare_epaper_397_store` | `waveshare_epaper_397` | `waveshare-epaper-397-` |
+| M5Paper v1.0 / v1.1 (experimental, acceptance pending) | `m5paper_v11_store` | `m5paper` | `m5paper-v11-` |
 
-| M5Paper v1.1 (experimental, untested) | `m5paper_v11_store` | `m5paper` | `m5paper-v11-` |
-
-The first three are ESP32-S3; M5Paper v1.1 is classic ESP32. All use 16 MiB Flash
+The first three are ESP32-S3; original M5Paper v1.0/v1.1 share a classic ESP32 image.
+The `v11` environment and asset names remain unchanged for existing consumers.
+All use 16 MiB Flash
 and the current `partitions.csv`
 layout. PaperS3's SDK runtime model is `m5paper_s3`; it has its own binary,
 not the PaperMono image. This matrix is independent of the official Nightly
@@ -222,7 +223,7 @@ The packager preserves each built bootloader header and does not rewrite it.
 
 The full matrix now also includes X3/X4, Sticky, X4 Pro, X4 Classic, EEGO A4,
 Murphy M4, Metalio E-Ink 4, Read Pico and LilyGo T5 S3: thirteen images for
-fourteen models. These additional targets are Alpha, without maintainer physical
+fifteen models, counting both original M5Paper revisions. These additional targets are Alpha, without maintainer physical
 acceptance. See [crossstore-device-matrix.md](crossstore-device-matrix.md) for the
 complete environment/capability list and the separate pending Ink4 Plus/ML307 port.
 Manifests record `validationStatus`; this is a historical hardware-record label,

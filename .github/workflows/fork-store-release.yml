@@ -133,12 +133,15 @@ jobs:
                    'AppStore builds for all hardware targets currently integrated in this CrossMux fork.', '',
                    'Source: `' + os.environ['GITHUB_SHA'] + '`',
                    'SDK: `' + os.environ['SDK_SHA'] + '`', '',
-                   'Only PaperMono, PaperS3 and Waveshare 3.97 have prior physical test records from this fork maintainer.',
-                   'All other models are **Alpha — no maintainer hardware test**. Upstream records do not establish acceptance of this Store build.', '',
+                   'PaperMono, PaperS3 and Waveshare 3.97 have prior physical test records from this fork maintainer.',
+                   'Original M5Paper now has a basic hardware record; its shared v1.1 image remains Alpha because v1.1 has not been physically tested.',
+                   'All other models are **Alpha — no maintainer hardware test**. Prior records do not establish acceptance of every newly built binary.', '',
                    '| Device | Environment | Version | Validation |', '| --- | --- | --- | --- |']
           for path in sorted(Path('publish').glob('*-install-manifest.json')):
               item = json.loads(path.read_text())
               status = 'Prior hardware record; current build acceptance pending' if item['deviceSlug'] in ('papermono', 'papers3', 'waveshare-epaper-397') else 'Alpha — not physically tested'
+              if item['deviceSlug'] == 'm5paper-v11':
+                  status = 'Alpha — shared original / v1.1 image; original basic checks passed, v1.1 untested'
               lines.append('| ' + ' | '.join(item[k] for k in ('deviceSlug', 'environment', 'version')) + ' | ' + status + ' |')
           lines += ['', 'Use the matching device firmware.bin for an existing compatible CrossMux installation.',
                     'Full-install.bin starts at 0x0 and replaces the bootloader, partition table and NVS/OTA data.',
@@ -150,7 +153,9 @@ jobs:
                     'Waveshare paired chat, sustained USB transfers and sleep cycles still need device testing.',
                     'PaperMono buzzer playback remains quiet in listening tests; this release does not claim to resolve its loudness.',
                     'PaperS3 includes stale-touch recovery and avoids notification render-lock waits when the inbox is empty; renewed touch acceptance is pending.',
-                    'M5Paper v1.1 is a new ESP32 experimental port: build/host tests only, NO physical validation. Display, touch, SD, RTC and sleep must still be tested.',
+                    'Original M5Paper and M5Paper v1.1 use the same m5paper-v11 image (classic ESP32, not PaperS3). This release fixes IT8951 startup and HRDY command/read handshakes.',
+                    '初代 M5Paper 与 M5Paper v1.1 共用固件。初代已验证显示、触摸、轮键、TF 卡读写、阅读进度和一次休眠恢复；v1.1 未实机测试，仍为 Alpha。',
+                    'Original M5Paper basic display, touch, wheel keys, TF read/write, EPUB progress and one captured deep-sleep resume passed on the corresponding local source. v1.1, repeated sleep cycles, full grayscale acceptance and power measurements remain untested. An earlier return-to-Home report was not reproduced; no sleep-specific fix is claimed.',
                     'M5Paper has native 16-gray icons, Lua apps and ESP-NOW; no Tox wifi_chat, USB disk, speaker/microphone or LoRa support is advertised.',
                     'M5Paper full images include an erased 0x1000 prefix: flash the merged image at 0x0, or the separate bootloader at 0x1000 (S3 bootloaders start at 0x0).', '',
                     'The app store is experimental: the preview downloader skips HTTPS certificate verification and packages are not publisher-signed.',

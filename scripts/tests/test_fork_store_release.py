@@ -103,6 +103,7 @@ class ForkStoreReleaseTest(unittest.TestCase):
         self.assertEqual(set(nightly_targets.targets_for('stable')), set(nightly_targets.targets_for('nightly')))
         self.assertEqual(len(nightly_targets.targets_for('stable')), 9)
         self.assertEqual(release.TARGETS['m5stack_papers3']['models'], ['m5paper_s3'])
+        self.assertEqual(release.TARGETS['m5stack_m5paper_v11']['models'], ['m5paper_v10', 'm5paper_v11'])
         config = configparser.ConfigParser(interpolation=None)
         config.read(ROOT / 'platformio.ini')
         for target in release.TARGETS.values():

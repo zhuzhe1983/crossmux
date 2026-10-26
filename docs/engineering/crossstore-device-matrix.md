@@ -2,11 +2,13 @@
 
 The fork publishes separate Store images for every hardware target integrated in
 CrossMux. This does not imply support for every board profile present only in
-FreeInk SDK. X3/X4 share one C3 image; all other rows use separate images.
+FreeInk SDK. X3/X4 share one C3 image. Original M5Paper v1.0/v1.1 share one classic ESP32 image; other rows use separate images.
 
-Only PaperMono, PaperS3 and Waveshare 3.97 have prior physical test records from
-the CrossStore maintainer. Those records do not validate every subsequent binary.
-Every other row is **Alpha — not physically tested by this maintainer**. Build
+PaperMono, PaperS3 and Waveshare 3.97 have prior physical test records from
+the CrossStore maintainer. Original M5Paper also has a basic physical record;
+its shared image remains Alpha because v1.1 is untested and extended acceptance
+is pending. Those records do not validate every subsequent binary.
+All remaining rows are **Alpha — not physically tested by this maintainer**. Build
 success and upstream hardware records are recorded separately from local physical
 acceptance. Report bugs at https://github.com/zhuzhe1983/crossmux/issues/new with
 model, release/version, reproduction steps and logs/photos. The website prefills
@@ -17,7 +19,7 @@ that context; a report does not require contacting upstream CrossMux maintainers
 | PaperMono | `papermono_store` | S3 | Prior test record |
 | PaperS3 | `papers3_store` | S3 | Prior test record; new touch fix acceptance pending |
 | Waveshare ESP32-S3-ePaper-3.97 | `waveshare_epaper_397_store` | S3 | Prior test record; AirTune loudness unresolved |
-| M5Paper v1.1 | `m5paper_v11_store` | ESP32 | Alpha |
+| M5Paper original / v1.1 | `m5paper_v11_store` | ESP32 | Shared Alpha image; original basic display, input, TF, reading and one sleep/resume passed; v1.1 untested |
 | Xteink X3 / X4 | `xteink_store` | C3 | Alpha |
 | Seeed Sticky | `sticky_store` | S3 | Alpha |
 | Xteink X4 Pro | `x4pro_store` | S3 | Alpha |
@@ -32,7 +34,10 @@ All share the 16 MiB dual-OTA layout but retain their own bootloader, board tag
 and image. The release packager checks the chip and Flash header, partition table,
 image offsets, source/SDK revisions and hashes. Manifest `validationStatus` is
 `prior-hardware-record` for the first three rows, `alpha-unverified` otherwise.
-Neither means the particular release has passed physical acceptance.
+Neither means the particular release has passed physical acceptance. The shared
+M5Paper target retains `alpha-unverified` for compatibility and to avoid promoting
+the untested v1.1 revision; the release notes and website state its per-revision
+record explicitly.
 
 C3 has no PSRAM: the package manifest rejects >64 KiB Lua budgets without a PSRAM
 requirement, and PSRAM-dependent packages are incompatible. Its initial Store

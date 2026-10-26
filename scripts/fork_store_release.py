@@ -26,7 +26,7 @@ TARGETS = {
                       'chip': 'ESP32-S3', 'chipId': 9, 'environment': 'papers3_store', 'flashMode': 'qio'},
     'waveshare_epaper_397': {**OFFICIAL_TARGETS['waveshare_epaper_397'],
                            'environment': 'waveshare_epaper_397_store', 'flashMode': 'dio'},
-    'm5stack_m5paper_v11': {'deviceSlug': 'm5paper-v11', 'models': ['m5paper_v11'], 'boardTag': 'm5paper',
+    'm5stack_m5paper_v11': {'deviceSlug': 'm5paper-v11', 'models': ['m5paper_v10', 'm5paper_v11'], 'boardTag': 'm5paper',
                           'chip': 'ESP32', 'chipId': 0, 'environment': 'm5paper_v11_store', 'flashMode': 'qio',
                           'mcu': 'esp32', 'bootloaderOffset': 0x1000, 'flashFrequency': '40m'},
 }

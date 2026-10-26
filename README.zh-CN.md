@@ -38,7 +38,7 @@
 
 [M5Stack PaperS3](./docs/engineering/papers3.md) 提供实验性开发构建（`pio run -e papers3`），与 Paper Mono 使用不同固件。v1.0 实机已通过基础显示、触摸、EPUB 阅读和两次休眠恢复测试，其余验收项目仍待完成。原生 16 级灰阶与语义应用图标也已通过实机检查，暂不加入公开 Nightly 与 OTA 索引。
 
-[M5Paper v1.1](./docs/engineering/m5paper-v11.md) 新增老款 ESP32 的实验构建（`m5paper_v11` / `m5paper_v11_store`），包含原生 16 灰阶图片、RTC 和 Lua 应用。尚未实机验证，不提供 USB 磁盘或 Tox；本分支的 Release 与网页刷机入口均标为实验支持。
+[M5Paper v1.0 / v1.1](./docs/engineering/m5paper-v11.md) 共用老款 ESP32 的实验构建（`m5paper_v11` / `m5paper_v11_store`），包含原生 16 灰阶图片、RTC 和 Lua 应用。初代硬屏和 v1.1 柔性屏使用相同的 IT8951 接口及固件，保留原有 `v11` 构建与文件名以兼容旧链接。初代已验证显示、触摸、轮键、TF 卡读写、阅读进度和一次休眠恢复；v1.1 与扩展验收仍待完成。不提供 USB 磁盘或 Tox。
 
 正式版本使用 [Stable](https://github.com/0x1abin/crossmux/releases/tag/stable)，开发版本使用 [Nightly](https://github.com/0x1abin/crossmux/releases/tag/nightly)，两渠道采用相同目标与打包规则。[目标表](./scripts/nightly_targets.py) 定义渠道与产物名称；[发布架构](./docs/engineering/firmware-release.md) 说明打包与 OTA。当前源码版本及构建环境以 [platformio.ini](./platformio.ini) 为准。
 

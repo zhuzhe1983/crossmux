@@ -11,8 +11,9 @@
 > on both the Xteink X3 and X4, how the device is detected at boot, what differs
 > between the two panels, and how to build / flash / verify for X3.
 
-[M5Paper v1.1](m5paper-v11.md) adds separate classic ESP32 development and Store
-targets. It is experimental and has not been physically validated.
+[M5Paper v1.0 / v1.1](m5paper-v11.md) share classic ESP32 development and Store
+targets. The shared image remains experimental: original-device basic display,
+touch, wheel, TF, reading and one sleep/resume passed; v1.1 is not physically tested.
 
 ## TL;DR
 
